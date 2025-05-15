@@ -21,7 +21,7 @@ type Holding struct {
 	DayChange        float64     `json:"dayChange"`
 	DayChangePercent float64     `json:"dayChangePercent"`
 	TotalPnL         float64     `json:"totalPnL"`
-	Platform         Platform    `json:"platform"`
+	Platform         string      `json:"platform"`
 	Type             HoldingType `json:"type"`
 	LastUpdated      time.Time   `json:"lastUpdated"`
 }
