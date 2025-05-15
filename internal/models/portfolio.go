@@ -10,14 +10,6 @@ const (
 	HoldingTypeMutualFund HoldingType = "mutualfund"
 )
 
-// Platform represents the broker platform
-type Platform string
-
-const (
-	PlatformZerodha Platform = "zerodha"
-	PlatformICICI   Platform = "icici"
-)
-
 // Holding represents a normalized holding item from any broker
 type Holding struct {
 	ItemName         string      `json:"itemName"`

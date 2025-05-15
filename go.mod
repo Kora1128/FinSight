@@ -3,6 +3,7 @@ module github.com/Kora1128/FinSight
 go 1.21
 
 require (
+	github.com/Kora1128/icici-breezeconnect-go v1.0.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
