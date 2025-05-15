@@ -1,4 +1,4 @@
-package zerodha
+package icici_direct
 
 import (
 	"context"
@@ -14,7 +14,8 @@ func TestNewClient(t *testing.T) {
 	apiSecret := "test-api-secret"
 	client := NewClient(apiKey, apiSecret)
 	assert.NotNil(t, client)
-	assert.NotNil(t, client.kc)
+	assert.Equal(t, apiKey, client.apiKey)
+	assert.Equal(t, apiSecret, client.apiSecret)
 }
 
 func TestLogin(t *testing.T) {
@@ -85,7 +86,7 @@ func TestGetHoldings(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Len(t, holdings, tt.expectedLen)
 				for _, holding := range holdings {
-					assert.Equal(t, models.PlatformZerodha, holding.Platform)
+					assert.Equal(t, models.PlatformICICIDirect, holding.Platform)
 					assert.Equal(t, models.HoldingTypeStock, holding.Type)
 				}
 			}
@@ -127,7 +128,7 @@ func TestGetPositions(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Len(t, positions, tt.expectedLen)
 				for _, position := range positions {
-					assert.Equal(t, models.PlatformZerodha, position.Platform)
+					assert.Equal(t, models.PlatformICICIDirect, position.Platform)
 					assert.Equal(t, models.HoldingTypeStock, position.Type)
 				}
 			}
