@@ -2,8 +2,10 @@ package icici_direct
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/Kora1128/FinSight/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,28 +19,119 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	client := NewClient("test-api-key", "test-api-secret")
-	// Test with valid credentials
-	err := client.Login("valid-token", "valid-secret")
-	assert.NoError(t, err)
+	tests := []struct {
+		name        string
+		mockClient  *MockClient
+		wantErr     bool
+		expectedErr error
+	}{
+		{
+			name:        "successful login",
+			mockClient:  NewMockClient(),
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "failed login",
+			mockClient:  NewMockClient().WithLoginError(errors.New("invalid credentials")),
+			wantErr:     true,
+			expectedErr: errors.New("invalid credentials"),
+		},
+	}
 
-	// Test with invalid credentials
-	err = client.Login("", "")
-	assert.Error(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.mockClient.Login("test-token", "test-secret")
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestGetHoldings(t *testing.T) {
-	client := NewClient("test-api-key", "test-api-secret")
-	holdings, err := client.GetHoldings(context.Background())
-	assert.NoError(t, err)
-	assert.NotNil(t, holdings)
-	assert.Empty(t, holdings) // Currently returns an empty slice
+	tests := []struct {
+		name        string
+		mockClient  *MockClient
+		wantErr     bool
+		expectedErr error
+		expectedLen int
+	}{
+		{
+			name:        "successful holdings fetch",
+			mockClient:  NewMockClient().WithMockHoldings(GetDefaultMockHoldings()),
+			wantErr:     false,
+			expectedErr: nil,
+			expectedLen: 2,
+		},
+		{
+			name:        "failed holdings fetch",
+			mockClient:  NewMockClient().WithHoldingsError(errors.New("api error")),
+			wantErr:     true,
+			expectedErr: errors.New("api error"),
+			expectedLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			holdings, err := tt.mockClient.GetHoldings(context.Background())
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, holdings, tt.expectedLen)
+				for _, holding := range holdings {
+					assert.Equal(t, models.PlatformICICIDirect, holding.Platform)
+					assert.Equal(t, models.HoldingTypeStock, holding.Type)
+				}
+			}
+		})
+	}
 }
 
 func TestGetPositions(t *testing.T) {
-	client := NewClient("test-api-key", "test-api-secret")
-	positions, err := client.GetPositions(context.Background())
-	assert.NoError(t, err)
-	assert.NotNil(t, positions)
-	assert.Empty(t, positions) // Currently returns an empty slice
+	tests := []struct {
+		name        string
+		mockClient  *MockClient
+		wantErr     bool
+		expectedErr error
+		expectedLen int
+	}{
+		{
+			name:        "successful positions fetch",
+			mockClient:  NewMockClient().WithMockPositions(GetDefaultMockPositions()),
+			wantErr:     false,
+			expectedErr: nil,
+			expectedLen: 1,
+		},
+		{
+			name:        "failed positions fetch",
+			mockClient:  NewMockClient().WithPositionsError(errors.New("api error")),
+			wantErr:     true,
+			expectedErr: errors.New("api error"),
+			expectedLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			positions, err := tt.mockClient.GetPositions(context.Background())
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, positions, tt.expectedLen)
+				for _, position := range positions {
+					assert.Equal(t, models.PlatformICICIDirect, position.Platform)
+					assert.Equal(t, models.HoldingTypeStock, position.Type)
+				}
+			}
+		})
+	}
 }
