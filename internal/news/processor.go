@@ -45,31 +45,18 @@ func (p *Processor) analyzeSentiment(item NewsItem) float64 {
 	title := strings.ToLower(item.Title)
 	description := strings.ToLower(item.Description)
 
-	// Define positive and negative keywords
-	positiveKeywords := []string{
-		"strong", "growth", "profit", "gain", "upgrade", "positive", "bullish",
-		"increase", "higher", "better", "exceed", "beat", "surge", "rise",
-		"outperform", "success", "opportunity", "potential", "promising",
-	}
-
-	negativeKeywords := []string{
-		"weak", "loss", "decline", "downgrade", "negative", "bearish",
-		"decrease", "lower", "worse", "miss", "fall", "drop", "underperform",
-		"risk", "concern", "warning", "caution", "volatile",
-	}
-
 	// Count positive and negative matches
 	positiveCount := 0
 	negativeCount := 0
 
 	// Check title and description for keywords
 	text := title + " " + description
-	for _, keyword := range positiveKeywords {
+	for _, keyword := range PositiveKeywords {
 		if strings.Contains(text, keyword) {
 			positiveCount++
 		}
 	}
-	for _, keyword := range negativeKeywords {
+	for _, keyword := range NegativeKeywords {
 		if strings.Contains(text, keyword) {
 			negativeCount++
 		}
@@ -78,7 +65,7 @@ func (p *Processor) analyzeSentiment(item NewsItem) float64 {
 	// Calculate sentiment score (-1 to 1)
 	totalCount := positiveCount + negativeCount
 	if totalCount == 0 {
-		return 0 // Neutral if no keywords found
+		return NeutralSentimentScore // Neutral if no keywords found
 	}
 
 	// Normalize to -1 to 1 range
@@ -87,18 +74,18 @@ func (p *Processor) analyzeSentiment(item NewsItem) float64 {
 	// Adjust based on source reliability
 	switch item.Source.Name {
 	case "MoneyControl":
-		sentiment *= 1.2 // Boost sentiment for reliable sources
+		sentiment *= MoneyControlMultiplier
 	case "Economic Times":
-		sentiment *= 1.1
+		sentiment *= EconomicTimesMultiplier
 	case "Business Standard":
-		sentiment *= 1.1
+		sentiment *= BusinessStandardMultiplier
 	}
 
-	// Ensure sentiment stays within -1 to 1 range
-	if sentiment > 1.0 {
-		sentiment = 1.0
-	} else if sentiment < -1.0 {
-		sentiment = -1.0
+	// Ensure sentiment stays within bounds
+	if sentiment > MaxSentimentScore {
+		sentiment = MaxSentimentScore
+	} else if sentiment < MinSentimentScore {
+		sentiment = MinSentimentScore
 	}
 
 	return sentiment
@@ -134,39 +121,31 @@ func (p *Processor) calculateRelevanceScore(item NewsItem) float64 {
 	var score float64
 
 	// Check for important keywords
-	keywords := []string{
-		"earnings", "quarterly results", "financial results",
-		"dividend", "acquisition", "merger", "takeover",
-		"upgrade", "downgrade", "analyst", "rating",
-		"guidance", "forecast", "outlook", "bullish", "bearish",
-	}
-
 	title := strings.ToLower(item.Title)
 	description := strings.ToLower(item.Description)
 
-	for _, keyword := range keywords {
+	for _, keyword := range RelevanceKeywords {
 		if strings.Contains(title, keyword) || strings.Contains(description, keyword) {
-			score += 0.2
+			score += KeywordMatchScore
 		}
 	}
 
 	// Check source reliability
-	switch item.Source.Name {
-	case "MoneyControl", "Economic Times", "Business Standard":
-		score += 0.3
+	if ReliableSources[item.Source.Name] {
+		score += SourceReliabilityScore
 	}
 
 	// Check recency
 	age := time.Since(item.PublishedAt)
-	if age < 24*time.Hour {
-		score += 0.2
-	} else if age < 48*time.Hour {
-		score += 0.1
+	if age < time.Duration(RecentNewsThreshold)*time.Second {
+		score += RecentNewsScore
+	} else if age < time.Duration(OlderNewsThreshold)*time.Second {
+		score += OlderNewsScore
 	}
 
 	// Normalize score to 0-1 range
-	if score > 1.0 {
-		score = 1.0
+	if score > MaxRelevanceScore {
+		score = MaxRelevanceScore
 	}
 
 	return score
@@ -174,16 +153,16 @@ func (p *Processor) calculateRelevanceScore(item NewsItem) float64 {
 
 // determineAction determines the recommended action based on sentiment and relevance
 func (p *Processor) determineAction(sentiment, relevance float64) string {
-	if relevance < 0.5 {
-		return "WATCH"
+	if relevance < RelevanceThreshold {
+		return ActionWatch
 	}
 
-	if sentiment > 0.3 {
-		return "BUY"
-	} else if sentiment < -0.3 {
-		return "SELL"
+	if sentiment > PositiveSentimentThreshold {
+		return ActionBuy
+	} else if sentiment < NegativeSentimentThreshold {
+		return ActionSell
 	} else {
-		return "HOLD"
+		return ActionHold
 	}
 }
 
@@ -194,18 +173,18 @@ func (p *Processor) calculateConfidence(item NewsItem) float64 {
 	// Source reliability
 	switch item.Source.Name {
 	case "MoneyControl":
-		confidence += 0.4
+		confidence += MoneyControlConfidence
 	case "Economic Times":
-		confidence += 0.35
+		confidence += EconomicTimesConfidence
 	case "Business Standard":
-		confidence += 0.35
+		confidence += BusinessStandardConfidence
 	default:
-		confidence += 0.2
+		confidence += DefaultSourceConfidence
 	}
 
 	// Content quality
 	if len(item.Description) > 100 {
-		confidence += 0.2
+		confidence += ContentQualityScore
 	}
 
 	// Sentiment strength
@@ -213,11 +192,11 @@ func (p *Processor) calculateConfidence(item NewsItem) float64 {
 	if sentimentStrength < 0 {
 		sentimentStrength = -sentimentStrength
 	}
-	confidence += sentimentStrength * 0.2
+	confidence += sentimentStrength * SentimentStrengthWeight
 
 	// Normalize confidence to 0-1 range
-	if confidence > 1.0 {
-		confidence = 1.0
+	if confidence > MaxConfidenceScore {
+		confidence = MaxConfidenceScore
 	}
 
 	return confidence
