@@ -23,6 +23,9 @@ type Config struct {
 	ICICIAPISecret string
 	ICICIPassword  string
 
+	// OpenAI configuration
+	OpenAIAPIKey string
+
 	// Cache configuration
 	CacheTTL time.Duration
 
@@ -48,6 +51,9 @@ func New() *Config {
 		ICICIAPIKey:    getEnv("ICICI_API_KEY", ""),
 		ICICIAPISecret: getEnv("ICICI_API_SECRET", ""),
 		ICICIPassword:  getEnv("ICICI_PASSWORD", ""),
+
+		// OpenAI configuration
+		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
 
 		// Cache configuration
 		CacheTTL: getDurationEnv("CACHE_TTL", 15*time.Minute),

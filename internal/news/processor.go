@@ -2,19 +2,22 @@ package news
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 )
 
 // Processor handles filtering and processing of news items
 type Processor struct {
-	cache *RecommendationCache
+	cache         *RecommendationCache
+	stockResolver StockResolver
 }
 
 // NewProcessor creates a new news processor
-func NewProcessor(cache *RecommendationCache) *Processor {
+func NewProcessor(cache *RecommendationCache, openAIKey string) *Processor {
 	return &Processor{
-		cache: cache,
+		cache:         cache,
+		stockResolver: NewOpenAIStockResolver(openAIKey),
 	}
 }
 
@@ -208,9 +211,19 @@ func (p *Processor) calculateConfidence(item NewsItem) float64 {
 
 // extractStockSymbol extracts the stock symbol from the news item
 func (p *Processor) extractStockSymbol(item NewsItem) string {
-	// TODO: Implement more sophisticated stock symbol extraction
-	// For now, just return a placeholder
-	return "NIFTY"
+	// Combine title and description for better context
+	text := item.Title + " " + item.Description
+
+	// Use the stock resolver to get the symbol
+	symbol, err := p.stockResolver.ResolveSymbol(context.Background(), text)
+	if err != nil {
+		// Log the error but continue processing
+		// In a production environment, you might want to use proper logging
+		fmt.Printf("Error resolving stock symbol: %v\n", err)
+		return ""
+	}
+
+	return symbol
 }
 
 // generateReason generates a human-readable reason for the recommendation

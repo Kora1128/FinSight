@@ -13,17 +13,21 @@ import (
 
 	"github.com/Kora1128/FinSight/internal/api/handlers"
 	"github.com/Kora1128/FinSight/internal/api/middleware"
+	"github.com/Kora1128/FinSight/internal/config"
 	"github.com/Kora1128/FinSight/internal/news"
 )
 
 func main() {
+	// Load configuration
+	cfg := config.New()
+
 	// Initialize news engine components
 	cache := news.NewRecommendationCache(news.CacheConfig{
 		MaxItems:        1000,
 		TTL:             24 * time.Hour,
 		CleanupInterval: 1 * time.Hour,
 	})
-	processor := news.NewProcessor(cache)
+	processor := news.NewProcessor(cache, cfg.OpenAIAPIKey)
 	fetcher := news.NewNewsFetcher()
 
 	// Set up background context for periodic news fetching
@@ -78,15 +82,17 @@ func main() {
 	}
 
 	// Create HTTP server
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: router,
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      router,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
 	}
 
 	// Start server in a goroutine
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error starting server: %v", err)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
 
@@ -97,14 +103,8 @@ func main() {
 
 	// Graceful shutdown
 	log.Println("Shutting down server...")
-	cancel() // Stop news fetching
-
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
-
 	log.Println("Server exiting")
 }

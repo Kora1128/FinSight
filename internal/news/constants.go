@@ -66,7 +66,9 @@ var (
 		"increase", "higher", "better", "exceed", "beat", "surge", "rise",
 		"outperform", "success", "opportunity", "potential", "promising",
 		"dividend", "acquisition", "expansion", "record", "breakthrough",
-		"innovation", "partnership", "award", "recognition", "milestone",
+		"innovation", "partnership", "award", "recognition", "milestone", "rises",
+		"revenue", "profit", "growth", "strategy", "plan", "initiative",
+		"investment", "partnership", "agreement", "contract", "deal",
 	}
 
 	// Negative keywords indicate bearish or negative sentiment
@@ -75,7 +77,8 @@ var (
 		"decrease", "lower", "worse", "miss", "fall", "drop", "underperform",
 		"risk", "concern", "warning", "caution", "volatile", "uncertainty",
 		"challenge", "pressure", "decline", "reduction", "cut", "delay",
-		"disappoint", "struggle", "difficulty", "setback",
+		"disappoint", "struggle", "difficulty", "setback", "downgrade",
+		"declines",
 	}
 
 	// Relevance keywords indicate important financial news

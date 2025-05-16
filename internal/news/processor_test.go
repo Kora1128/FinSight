@@ -12,13 +12,17 @@ func TestNewProcessor(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	processor := NewProcessor(cache)
+	resolver := NewMockStockResolver()
+	processor := NewProcessor(cache, resolver)
 
 	if processor == nil {
 		t.Error("Expected non-nil processor")
 	}
 	if processor.cache != cache {
 		t.Error("Expected cache to be set correctly")
+	}
+	if processor.stockResolver != resolver {
+		t.Error("Expected stock resolver to be set correctly")
 	}
 }
 
@@ -28,7 +32,8 @@ func TestProcessNews(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	processor := NewProcessor(cache)
+	resolver := NewMockStockResolver()
+	processor := NewProcessor(cache, resolver)
 
 	// Test empty news items
 	recommendations := processor.ProcessNews(context.Background(), []NewsItem{})
@@ -67,11 +72,12 @@ func TestProcessNews(t *testing.T) {
 }
 
 func TestAnalyzeSentiment(t *testing.T) {
+	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}))
+	}), resolver)
 
 	tests := []struct {
 		name     string
@@ -124,11 +130,12 @@ func TestAnalyzeSentiment(t *testing.T) {
 }
 
 func TestCalculateRelevanceScore(t *testing.T) {
+	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}))
+	}), resolver)
 
 	tests := []struct {
 		name     string
@@ -171,11 +178,12 @@ func TestCalculateRelevanceScore(t *testing.T) {
 }
 
 func TestDetermineAction(t *testing.T) {
+	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}))
+	}), resolver)
 
 	tests := []struct {
 		name      string
@@ -220,11 +228,12 @@ func TestDetermineAction(t *testing.T) {
 }
 
 func TestCalculateConfidence(t *testing.T) {
+	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}))
+	}), resolver)
 
 	tests := []struct {
 		name     string
@@ -267,11 +276,12 @@ func TestCalculateConfidence(t *testing.T) {
 }
 
 func TestGenerateReason(t *testing.T) {
+	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}))
+	}), resolver)
 
 	tests := []struct {
 		name       string
@@ -318,7 +328,8 @@ func TestGetRecommendationsByStock(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	processor := NewProcessor(cache)
+	resolver := NewMockStockResolver()
+	processor := NewProcessor(cache, resolver)
 
 	// Add some test recommendations
 	recommendations := []Recommendation{
@@ -327,8 +338,10 @@ func TestGetRecommendationsByStock(t *testing.T) {
 			Action:      ActionBuy,
 			Confidence:  0.8,
 			NewsItem: NewsItem{
-				Title:  "NIFTY shows growth",
-				Source: "MoneyControl",
+				Title:       "NIFTY shows strong growth potential",
+				Description: "NIFTY index reaches new highs",
+				Source:      "MoneyControl",
+				Link:        "http://example.com/1",
 			},
 			CreatedAt: time.Now(),
 		},
@@ -337,8 +350,22 @@ func TestGetRecommendationsByStock(t *testing.T) {
 			Action:      ActionSell,
 			Confidence:  0.7,
 			NewsItem: NewsItem{
-				Title:  "RELIANCE faces challenges",
-				Source: "Economic Times",
+				Title:       "RELIANCE faces market challenges",
+				Description: "RELIANCE stock price drops",
+				Source:      "Economic Times",
+				Link:        "http://example.com/2",
+			},
+			CreatedAt: time.Now(),
+		},
+		{
+			StockSymbol: "TCS",
+			Action:      ActionHold,
+			Confidence:  0.6,
+			NewsItem: NewsItem{
+				Title:       "TCS maintains steady growth",
+				Description: "TCS reports stable quarterly results",
+				Source:      "Business Standard",
+				Link:        "http://example.com/3",
 			},
 			CreatedAt: time.Now(),
 		},
@@ -366,6 +393,15 @@ func TestGetRecommendationsByStock(t *testing.T) {
 		t.Error("Expected RELIANCE stock symbol")
 	}
 
+	// Test getting TCS recommendations
+	tcsRecs := processor.GetRecommendationsByStock("TCS")
+	if len(tcsRecs) != 1 {
+		t.Errorf("Expected 1 TCS recommendation, got %d", len(tcsRecs))
+	}
+	if tcsRecs[0].StockSymbol != "TCS" {
+		t.Error("Expected TCS stock symbol")
+	}
+
 	// Test getting non-existent stock recommendations
 	unknownRecs := processor.GetRecommendationsByStock("UNKNOWN")
 	if len(unknownRecs) != 0 {
@@ -379,7 +415,8 @@ func TestGetLatestRecommendations(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	processor := NewProcessor(cache)
+	resolver := NewMockStockResolver()
+	processor := NewProcessor(cache, resolver)
 
 	// Add test recommendations with different timestamps
 	now := time.Now()
@@ -436,5 +473,101 @@ func TestGetLatestRecommendations(t *testing.T) {
 	allRecs := processor.GetLatestRecommendations(10)
 	if len(allRecs) != 3 {
 		t.Errorf("Expected 3 recommendations, got %d", len(allRecs))
+	}
+}
+
+func TestExtractStockSymbol(t *testing.T) {
+	resolver := NewMockStockResolver()
+	resolver.Symbols = map[string]string{
+		"RELIANCE":   "RELIANCE",
+		"TCS":        "TATA CONSULTANCY",
+		"HDFC":       "HDFC BANK",
+		"BHARTIARTL": "BHARTI AIRTEL",
+	}
+
+	processor := NewProcessor(NewRecommendationCache(CacheConfig{
+		TTL:             24 * time.Hour,
+		MaxItems:        1000,
+		CleanupInterval: 1 * time.Hour,
+	}), resolver)
+
+	tests := []struct {
+		name     string
+		item     NewsItem
+		expected string
+	}{
+		{
+			name: "Exact match with symbol",
+			item: NewsItem{
+				Title:       "RELIANCE stock price target",
+				Description: "RELIANCE shares show strong growth",
+			},
+			expected: "RELIANCE",
+		},
+		{
+			name: "Match with company name",
+			item: NewsItem{
+				Title:       "Tata Consultancy Services reports strong Q4 results",
+				Description: "TCS stock price expected to rise",
+			},
+			expected: "TCS",
+		},
+		{
+			name: "Match with context",
+			item: NewsItem{
+				Title:       "Stock of HDFC Bank shows strong momentum",
+				Description: "HDFC Bank shares trading at new highs",
+			},
+			expected: "HDFC",
+		},
+		{
+			name: "Match with variation",
+			item: NewsItem{
+				Title:       "Bharti Airtel announces new plans",
+				Description: "Airtel stock price target raised",
+			},
+			expected: "BHARTIARTL",
+		},
+		{
+			name: "Market-wide news",
+			item: NewsItem{
+				Title:       "Stock market update",
+				Description: "Market shows strong momentum",
+			},
+			expected: "NIFTY",
+		},
+		{
+			name: "No match",
+			item: NewsItem{
+				Title:       "General business news",
+				Description: "No specific stock mentioned",
+			},
+			expected: "",
+		},
+		{
+			name: "Multiple stocks mentioned",
+			item: NewsItem{
+				Title:       "RELIANCE and TCS show strong growth",
+				Description: "Both stocks trading at new highs",
+			},
+			expected: "RELIANCE", // Should return the first match
+		},
+		{
+			name: "Part of larger word",
+			item: NewsItem{
+				Title:       "RELIANCEGROUP announces merger",
+				Description: "New company formation",
+			},
+			expected: "", // Should not match as it's part of a larger word
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			symbol := processor.extractStockSymbol(tt.item)
+			if symbol != tt.expected {
+				t.Errorf("Expected symbol %s, got %s", tt.expected, symbol)
+			}
+		})
 	}
 }
