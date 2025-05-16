@@ -30,7 +30,7 @@ func (p *Processor) ProcessNews(ctx context.Context, newsItems []NewsItem) []Rec
 
 		// Process the news item
 		recommendation := p.processNewsItem(item)
-		if recommendation.RelevanceScore > 0.5 { // Only keep relevant items
+		if recommendation.Confidence > 0.5 { // Only keep high confidence recommendations
 			recommendations = append(recommendations, recommendation)
 			p.cache.Set(item.Link, recommendation)
 		}
@@ -72,7 +72,7 @@ func (p *Processor) analyzeSentiment(item NewsItem) float64 {
 	sentiment := float64(positiveCount-negativeCount) / float64(totalCount)
 
 	// Adjust based on source reliability
-	switch item.Source.Name {
+	switch item.Source {
 	case "MoneyControl":
 		sentiment *= MoneyControlMultiplier
 	case "Economic Times":
@@ -107,12 +107,16 @@ func (p *Processor) processNewsItem(item NewsItem) Recommendation {
 	// Calculate confidence based on source reliability and content quality
 	confidence := p.calculateConfidence(item)
 
+	// Extract stock symbol from title or description
+	stockSymbol := p.extractStockSymbol(item)
+
 	return Recommendation{
-		NewsItem:       item,
-		RelevanceScore: relevanceScore,
-		Action:         action,
-		Confidence:     confidence,
-		LastUpdated:    time.Now(),
+		StockSymbol: stockSymbol,
+		Action:      action,
+		Confidence:  confidence,
+		Reason:      p.generateReason(item, action, confidence),
+		NewsItem:    item,
+		CreatedAt:   time.Now(),
 	}
 }
 
@@ -131,7 +135,7 @@ func (p *Processor) calculateRelevanceScore(item NewsItem) float64 {
 	}
 
 	// Check source reliability
-	if ReliableSources[item.Source.Name] {
+	if ReliableSources[item.Source] {
 		score += SourceReliabilityScore
 	}
 
@@ -171,7 +175,7 @@ func (p *Processor) calculateConfidence(item NewsItem) float64 {
 	var confidence float64
 
 	// Source reliability
-	switch item.Source.Name {
+	switch item.Source {
 	case "MoneyControl":
 		confidence += MoneyControlConfidence
 	case "Economic Times":
@@ -202,14 +206,41 @@ func (p *Processor) calculateConfidence(item NewsItem) float64 {
 	return confidence
 }
 
+// extractStockSymbol extracts the stock symbol from the news item
+func (p *Processor) extractStockSymbol(item NewsItem) string {
+	// TODO: Implement more sophisticated stock symbol extraction
+	// For now, just return a placeholder
+	return "NIFTY"
+}
+
+// generateReason generates a human-readable reason for the recommendation
+func (p *Processor) generateReason(item NewsItem, action string, confidence float64) string {
+	var reason strings.Builder
+
+	reason.WriteString("Based on ")
+	if confidence > 0.8 {
+		reason.WriteString("strong ")
+	} else if confidence > 0.5 {
+		reason.WriteString("moderate ")
+	} else {
+		reason.WriteString("weak ")
+	}
+
+	reason.WriteString("sentiment from ")
+	reason.WriteString(item.Source)
+	reason.WriteString(" news: ")
+	reason.WriteString(item.Title)
+
+	return reason.String()
+}
+
 // GetRecommendationsByStock returns recommendations for a specific stock
 func (p *Processor) GetRecommendationsByStock(stockSymbol string) []Recommendation {
 	allRecs := p.cache.GetAll()
 	var stockRecs []Recommendation
 
 	for _, rec := range allRecs {
-		if strings.Contains(strings.ToLower(rec.Title), strings.ToLower(stockSymbol)) ||
-			strings.Contains(strings.ToLower(rec.Description), strings.ToLower(stockSymbol)) {
+		if rec.StockSymbol == stockSymbol {
 			stockRecs = append(stockRecs, rec)
 		}
 	}
@@ -224,10 +255,10 @@ func (p *Processor) GetLatestRecommendations(limit int) []Recommendation {
 		return allRecs
 	}
 
-	// Sort by LastUpdated
+	// Sort by CreatedAt
 	for i := 0; i < len(allRecs)-1; i++ {
 		for j := i + 1; j < len(allRecs); j++ {
-			if allRecs[i].LastUpdated.Before(allRecs[j].LastUpdated) {
+			if allRecs[i].CreatedAt.Before(allRecs[j].CreatedAt) {
 				allRecs[i], allRecs[j] = allRecs[j], allRecs[i]
 			}
 		}
