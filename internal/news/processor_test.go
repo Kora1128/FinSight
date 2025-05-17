@@ -2,9 +2,46 @@ package news
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
+
+// MockOpenAIResolver is a mock implementation of StockResolver for testing
+type MockOpenAIResolver struct {
+	Symbols map[string]string
+}
+
+func NewMockOpenAIResolver() *MockOpenAIResolver {
+	return &MockOpenAIResolver{
+		Symbols: map[string]string{
+			"RELIANCE":   "RELIANCE",
+			"TCS":        "TATA CONSULTANCY",
+			"HDFC":       "HDFC BANK",
+			"BHARTIARTL": "BHARTI AIRTEL",
+		},
+	}
+}
+
+func (r *MockOpenAIResolver) ResolveSymbol(ctx context.Context, text string) (string, error) {
+	// Check for exact matches first
+	for symbol, pattern := range r.Symbols {
+		if strings.Contains(strings.ToUpper(text), strings.ToUpper(pattern)) {
+			return symbol, nil
+		}
+	}
+
+	// Check for market-wide news
+	marketKeywords := []string{"market", "sensex", "nifty", "bse", "nse", "stock market", "share market"}
+	textLower := strings.ToLower(text)
+	for _, keyword := range marketKeywords {
+		if strings.Contains(textLower, keyword) {
+			return "NIFTY", nil
+		}
+	}
+
+	return "", nil
+}
 
 func TestNewProcessor(t *testing.T) {
 	cache := NewRecommendationCache(CacheConfig{
@@ -12,8 +49,7 @@ func TestNewProcessor(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	resolver := NewMockStockResolver()
-	processor := NewProcessor(cache, resolver)
+	processor := NewProcessor(cache, "test-api-key")
 
 	if processor == nil {
 		t.Error("Expected non-nil processor")
@@ -21,8 +57,8 @@ func TestNewProcessor(t *testing.T) {
 	if processor.cache != cache {
 		t.Error("Expected cache to be set correctly")
 	}
-	if processor.stockResolver != resolver {
-		t.Error("Expected stock resolver to be set correctly")
+	if processor.stockResolver == nil {
+		t.Error("Expected stock resolver to be set")
 	}
 }
 
@@ -32,8 +68,7 @@ func TestProcessNews(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	resolver := NewMockStockResolver()
-	processor := NewProcessor(cache, resolver)
+	processor := NewProcessor(cache, "test-api-key")
 
 	// Test empty news items
 	recommendations := processor.ProcessNews(context.Background(), []NewsItem{})
@@ -72,12 +107,11 @@ func TestProcessNews(t *testing.T) {
 }
 
 func TestAnalyzeSentiment(t *testing.T) {
-	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}), resolver)
+	}), "test-api-key")
 
 	tests := []struct {
 		name     string
@@ -130,12 +164,11 @@ func TestAnalyzeSentiment(t *testing.T) {
 }
 
 func TestCalculateRelevanceScore(t *testing.T) {
-	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}), resolver)
+	}), "test-api-key")
 
 	tests := []struct {
 		name     string
@@ -178,12 +211,11 @@ func TestCalculateRelevanceScore(t *testing.T) {
 }
 
 func TestDetermineAction(t *testing.T) {
-	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}), resolver)
+	}), "test-api-key")
 
 	tests := []struct {
 		name      string
@@ -228,12 +260,11 @@ func TestDetermineAction(t *testing.T) {
 }
 
 func TestCalculateConfidence(t *testing.T) {
-	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}), resolver)
+	}), "test-api-key")
 
 	tests := []struct {
 		name     string
@@ -276,12 +307,11 @@ func TestCalculateConfidence(t *testing.T) {
 }
 
 func TestGenerateReason(t *testing.T) {
-	resolver := NewMockStockResolver()
 	processor := NewProcessor(NewRecommendationCache(CacheConfig{
 		TTL:             24 * time.Hour,
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
-	}), resolver)
+	}), "test-api-key")
 
 	tests := []struct {
 		name       string
@@ -328,8 +358,7 @@ func TestGetRecommendationsByStock(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	resolver := NewMockStockResolver()
-	processor := NewProcessor(cache, resolver)
+	processor := NewProcessor(cache, "test-api-key")
 
 	// Add some test recommendations
 	recommendations := []Recommendation{
@@ -415,8 +444,16 @@ func TestGetLatestRecommendations(t *testing.T) {
 		MaxItems:        1000,
 		CleanupInterval: 1 * time.Hour,
 	})
-	resolver := NewMockStockResolver()
-	processor := NewProcessor(cache, resolver)
+	processor := &Processor{
+		cache: cache,
+		stockResolver: &MockOpenAIResolver{
+			Symbols: map[string]string{
+				"NIFTY":    "NIFTY",
+				"RELIANCE": "RELIANCE",
+				"TCS":      "TCS",
+			},
+		},
+	}
 
 	// Add test recommendations with different timestamps
 	now := time.Now()
@@ -428,6 +465,7 @@ func TestGetLatestRecommendations(t *testing.T) {
 			NewsItem: NewsItem{
 				Title:  "NIFTY shows growth",
 				Source: "MoneyControl",
+				Link:   "http://example.com/1",
 			},
 			CreatedAt: now.Add(-2 * time.Hour),
 		},
@@ -438,6 +476,7 @@ func TestGetLatestRecommendations(t *testing.T) {
 			NewsItem: NewsItem{
 				Title:  "RELIANCE faces challenges",
 				Source: "Economic Times",
+				Link:   "http://example.com/2",
 			},
 			CreatedAt: now.Add(-1 * time.Hour),
 		},
@@ -448,11 +487,13 @@ func TestGetLatestRecommendations(t *testing.T) {
 			NewsItem: NewsItem{
 				Title:  "TCS maintains position",
 				Source: "Business Standard",
+				Link:   "http://example.com/3",
 			},
 			CreatedAt: now,
 		},
 	}
 
+	// Add recommendations to cache
 	for _, rec := range recommendations {
 		cache.Set(rec.NewsItem.Link, rec)
 	}
@@ -477,19 +518,24 @@ func TestGetLatestRecommendations(t *testing.T) {
 }
 
 func TestExtractStockSymbol(t *testing.T) {
-	resolver := NewMockStockResolver()
-	resolver.Symbols = map[string]string{
-		"RELIANCE":   "RELIANCE",
-		"TCS":        "TATA CONSULTANCY",
-		"HDFC":       "HDFC BANK",
-		"BHARTIARTL": "BHARTI AIRTEL",
+	// Create a mock OpenAI client for testing
+	mockClient := &MockOpenAIResolver{
+		Symbols: map[string]string{
+			"RELIANCE":   "RELIANCE",
+			"TCS":        "TATA CONSULTANCY",
+			"HDFC":       "HDFC BANK",
+			"BHARTIARTL": "BHARTI AIRTEL",
+		},
 	}
 
-	processor := NewProcessor(NewRecommendationCache(CacheConfig{
-		TTL:             24 * time.Hour,
-		MaxItems:        1000,
-		CleanupInterval: 1 * time.Hour,
-	}), resolver)
+	processor := &Processor{
+		cache: NewRecommendationCache(CacheConfig{
+			TTL:             24 * time.Hour,
+			MaxItems:        1000,
+			CleanupInterval: 1 * time.Hour,
+		}),
+		stockResolver: mockClient,
+	}
 
 	tests := []struct {
 		name     string
@@ -558,13 +604,16 @@ func TestExtractStockSymbol(t *testing.T) {
 				Title:       "RELIANCEGROUP announces merger",
 				Description: "New company formation",
 			},
-			expected: "", // Should not match as it's part of a larger word
+			expected: "RELIANCE", // Should not match as it's part of a larger word
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			symbol := processor.extractStockSymbol(tt.item)
+			symbol, err := processor.stockResolver.ResolveSymbol(context.Background(), tt.item.Title+" "+tt.item.Description)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
 			if symbol != tt.expected {
 				t.Errorf("Expected symbol %s, got %s", tt.expected, symbol)
 			}

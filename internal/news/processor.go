@@ -279,3 +279,13 @@ func (p *Processor) GetLatestRecommendations(limit int) []Recommendation {
 
 	return allRecs[:limit]
 }
+
+// FetchNews fetches news from all configured sources
+func (p *Processor) FetchNews(ctx context.Context) ([]NewsItem, error) {
+	fetcher := NewNewsFetcher()
+	newsItems, err := fetcher.FetchNews(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching news: %w", err)
+	}
+	return newsItems, nil
+}
