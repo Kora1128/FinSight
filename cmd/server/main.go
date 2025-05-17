@@ -79,7 +79,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(appCache, zerodhaClient, iciciClient, 24*time.Hour)
 	
 	// Initialize router with routes
-	router := routes.SetupRouter(newsHandler, portfolioHandler, authHandler)
+	router := routes.SetupRouter(newsHandler, portfolioHandler, authHandler, appCache)
 
 	// Create HTTP server
 	srv := &http.Server{

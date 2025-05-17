@@ -16,4 +16,25 @@ type Client interface {
 
 	// Login authenticates the user with the broker
 	Login(requestToken, apiSecret string) error
+	
+	// CanAutoRefresh checks if the client can refresh the token automatically
+	CanAutoRefresh() bool
+	
+	// RefreshToken attempts to refresh the authentication token
+	RefreshToken() error
+	
+	// GetAccessToken returns the current access token
+	GetAccessToken() string
+	
+	// GetRefreshToken returns the current refresh token
+	GetRefreshToken() string
+	
+	// SetRefreshToken sets the refresh token
+	SetRefreshToken(token string)
+	
+	// GetLoginURL returns the login URL for OAuth flow
+	GetLoginURL(redirectURI string) string
+	
+	// GetAPIKey returns the API key
+	GetAPIKey() string
 }
