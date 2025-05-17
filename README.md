@@ -1,20 +1,54 @@
-# FinSight - Investment Portfolio Tracker & Recommendation Engine
+# FinSight - Personalized Investment Portfolio Tracker & Recommendation Engine
 
 A powerful investment portfolio tracking and stock recommendation system that aggregates holdings from Zerodha and ICICI Direct, providing daily stock recommendations based on curated news feeds.
 
 ## Features
 
-- Portfolio aggregation from Zerodha and ICICI Direct
-- Real-time portfolio tracking
-- Daily stock recommendations from trusted sources
-- In-memory caching for fast data access
-- RESTful API endpoints for frontend integration
+- **Portfolio Aggregation**: Combine holdings from Zerodha and ICICI Direct into a unified view
+- **Intelligent News Processing**: Filter financial news for relevant investment recommendations
+- **Sentiment Analysis**: Analyze news articles to determine market sentiment
+- **Stock Recommendations**: Get daily stock recommendations based on curated news
+- **Portfolio Management**: View combined portfolio with flexible filtering options
+- **In-memory Caching**: Fast data access with configurable TTL
+- **RESTful API Endpoints**: Well-structured API for frontend integration
 
 ## Prerequisites
 
-- Go 1.21 or later
-- Zerodha API credentials (API Key and Secret)
-- ICICI Direct API credentials (API Key, Secret, and Password)
+- Go 1.16+ 
+- Zerodha API Key & Secret
+- ICICI Direct API Key & Secret
+- OpenAI API Key (for stock symbol extraction from news)
+
+## Environment Variables
+
+Create a `.env` file with the following configurations:
+
+```
+# Server configuration
+APP_PORT=8080
+APP_ENV=development
+APP_READ_TIMEOUT=10s
+APP_WRITE_TIMEOUT=10s
+
+# Zerodha API configuration
+ZERODHA_API_KEY=your_zerodha_api_key
+ZERODHA_API_SECRET=your_zerodha_api_secret
+
+# ICICI Direct API configuration
+ICICI_API_KEY=your_icici_api_key
+ICICI_API_SECRET=your_icici_api_secret
+ICICI_PASSWORD=your_icici_password
+
+# OpenAI configuration
+OPENAI_API_KEY=your_openai_api_key
+
+# Cache configuration
+CACHE_TTL=15m
+
+# News configuration
+NEWS_REFRESH_INTERVAL=24h
+TRUSTED_SOURCES=Economic Times,Business Standard,Moneycontrol,Livemint,Reuters India,BloombergQuint
+```
 
 ## Installation
 
@@ -29,22 +63,6 @@ cd FinSight
 go mod download
 ```
 
-3. Set up environment variables:
-```bash
-# Zerodha API Credentials
-export ZERODHA_API_KEY="your_api_key"
-export ZERODHA_API_SECRET="your_api_secret"
-
-# ICICI Direct API Credentials
-export ICICI_API_KEY="your_api_key"
-export ICICI_API_SECRET="your_api_secret"
-export ICICI_PASSWORD="your_password"
-
-# Application Configuration
-export APP_PORT="8080"
-export APP_ENV="development" # or "production"
-```
-
 ## Running the Application
 
 1. Start the server:
@@ -57,47 +75,71 @@ The server will start on port 8080 by default (configurable via APP_PORT environ
 ## API Endpoints
 
 ### Authentication
-- `POST /api/v1/login/zerodha` - Zerodha login
-- `POST /api/v1/login/icici` - ICICI Direct login
+
+- `POST /api/v1/login/zerodha`: Authenticate with Zerodha
+- `POST /api/v1/login/icici`: Authenticate with ICICI Direct
+- `GET /api/v1/user/status`: Check login status for both brokers
 
 ### Portfolio
-- `GET /api/v1/portfolio` - Get aggregated portfolio
-  - Query Parameters:
-    - `type`: stock|mutualfund|all (default: all)
-- `POST /api/v1/portfolio/refresh` - Refresh portfolio data
+
+- `GET /api/v1/portfolio`: Retrieve aggregated portfolio data
+  - Query params: `type=stock|mutualfund|all` (default: all)
+- `POST /api/v1/portfolio/refresh`: Force refresh of portfolio data
 
 ### Recommendations
-- `GET /api/v1/recommendations` - Get daily stock recommendations
 
-### User Status
-- `GET /api/v1/user/status` - Check login status for brokers
+- `GET /api/v1/recommendations`: Get all stock recommendations
+- `GET /api/v1/recommendations/latest`: Get latest recommendations
+- `GET /api/v1/recommendations/stock/:symbol`: Get recommendations for a specific stock
+
+### News Sources
+
+- `GET /api/v1/news/sources`: Get all configured news sources
+- `POST /api/v1/news/sources`: Add a new news source
+- `DELETE /api/v1/news/sources/:name`: Remove a news source
 
 ## Project Structure
 
 ```
-.
+FinSight/
 ├── cmd/
-│   └── server/
+│   └── server/           # Application entry point
 │       └── main.go
 ├── internal/
-│   ├── api/
+│   ├── api/              # API handlers, middleware, and routes
 │   │   ├── handlers/
 │   │   ├── middleware/
 │   │   └── routes/
-│   ├── broker/
-│   │   ├── zerodha/
-│   │   └── icici/
-│   ├── cache/
-│   ├── config/
-│   ├── models/
-│   └── news/
-├── pkg/
-│   ├── logger/
-│   └── utils/
-├── go.mod
-├── go.sum
-└── README.md
+│   ├── broker/           # Broker integrations
+│   │   ├── icici_direct/ # ICICI Direct API integration
+│   │   └── zerodha/      # Zerodha API integration
+│   ├── cache/            # Cache implementation
+│   ├── config/           # Application configuration
+│   ├── models/           # Data models
+│   ├── news/             # News processing and recommendation engine
+│   └── portfolio/        # Portfolio aggregation service
+└── pkg/                  # Shared packages
+    ├── logger/           # Logging utilities
+    └── utils/            # General utilities
 ```
+
+## Dependencies
+
+- [github.com/gin-gonic/gin](https://github.com/gin-gonic/gin): Web framework
+- [github.com/zerodha/gokiteconnect](https://github.com/zerodha/gokiteconnect): Official Zerodha API client
+- [github.com/Kora1128/icici-breezeconnect-go](https://github.com/Kora1128/icici-breezeconnect-go): Custom ICICI Direct API client
+- [github.com/mmcdole/gofeed](https://github.com/mmcdole/gofeed): RSS feed parser
+- [github.com/patrickmn/go-cache](https://github.com/patrickmn/go-cache): In-memory caching
+- [github.com/sashabaranov/go-openai](https://github.com/sashabaranov/go-openai): OpenAI API client
+
+## Future Enhancements
+
+- Database integration for persistent storage
+- User authentication and multi-user support
+- Data visualization for portfolio performance
+- Mobile app integration
+- Custom watchlists and alerts
+- Advanced technical analysis
 
 ## Development
 

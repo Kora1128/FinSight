@@ -5,17 +5,14 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Kora1128/FinSight/internal/broker"
 	"github.com/Kora1128/FinSight/internal/models"
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect"
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect/services"
 )
 
-// ICICIClient defines the interface for ICICI Direct client operations
-type ICICIClient interface {
-	Login(requestToken, apiSecret string) error
-	GetHoldings(ctx context.Context) ([]models.Holding, error)
-	GetPositions(ctx context.Context) ([]models.Holding, error)
-}
+// Ensure Client implements broker.Client interface
+var _ broker.Client = (*Client)(nil)
 
 // Client represents the ICICI Direct broker integration client
 type Client struct {

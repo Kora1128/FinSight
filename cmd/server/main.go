@@ -9,26 +9,43 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/Kora1128/FinSight/internal/api/handlers"
-	"github.com/Kora1128/FinSight/internal/api/middleware"
+	"github.com/Kora1128/FinSight/internal/api/routes"
+	"github.com/Kora1128/FinSight/internal/broker/icici_direct"
+	"github.com/Kora1128/FinSight/internal/broker/zerodha"
+	"github.com/Kora1128/FinSight/internal/cache"
 	"github.com/Kora1128/FinSight/internal/config"
 	"github.com/Kora1128/FinSight/internal/news"
+	"github.com/Kora1128/FinSight/internal/portfolio"
 )
 
 func main() {
 	// Load configuration
 	cfg := config.New()
 
+	// Initialize cache
+	appCache := cache.New(cfg.CacheTTL, time.Hour)
+
 	// Initialize news engine components
-	cache := news.NewRecommendationCache(news.CacheConfig{
+	newsCache := news.NewRecommendationCache(news.CacheConfig{
 		MaxItems:        1000,
 		TTL:             24 * time.Hour,
 		CleanupInterval: 1 * time.Hour,
 	})
-	processor := news.NewProcessor(cache, cfg.OpenAIAPIKey)
+	processor := news.NewProcessor(newsCache, cfg.OpenAIAPIKey)
 	fetcher := news.NewNewsFetcher()
+
+	// Initialize broker clients
+	zerodhaClient := zerodha.NewClient(cfg.ZerodhaAPIKey, cfg.ZerodhaAPISecret)
+	iciciClient := icici_direct.NewClient(cfg.ICICIAPIKey, cfg.ICICIAPISecret)
+
+	// Initialize portfolio service
+	portfolioService := portfolio.NewService(portfolio.ServiceConfig{
+		ZerodhaClient: zerodhaClient,
+		ICICIClient:   iciciClient,
+		Cache:         appCache,
+		CacheTTL:      cfg.CacheTTL,
+	})
 
 	// Set up background context for periodic news fetching
 	ctx, cancel := context.WithCancel(context.Background())
@@ -56,30 +73,13 @@ func main() {
 		}
 	}()
 
-	// Initialize Gin router
-	router := gin.Default()
-
-	// Add middleware
-	router.Use(middleware.Logger())
-	router.Use(middleware.Recovery())
-	router.Use(middleware.CORS())
-
-	// Create news handler
+	// Create handlers
 	newsHandler := handlers.NewNewsHandler(processor, fetcher)
-
-	// Set up API routes
-	api := router.Group("/api/v1")
-	{
-		// News recommendations
-		api.GET("/recommendations", newsHandler.GetRecommendations)
-		api.GET("/recommendations/latest", newsHandler.GetLatestRecommendations)
-		api.GET("/recommendations/stock/:symbol", newsHandler.GetRecommendationsByStock)
-
-		// News sources
-		api.GET("/sources", newsHandler.GetSources)
-		api.POST("/sources", newsHandler.AddSource)
-		api.DELETE("/sources/:name", newsHandler.RemoveSource)
-	}
+	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
+	authHandler := handlers.NewAuthHandler(appCache, zerodhaClient, iciciClient, 24*time.Hour)
+	
+	// Initialize router with routes
+	router := routes.SetupRouter(newsHandler, portfolioHandler, authHandler)
 
 	// Create HTTP server
 	srv := &http.Server{
