@@ -42,6 +42,41 @@ func (m *MockBrokerClient) Login(requestToken, apiSecret string) error {
 	return nil
 }
 
+// CanAutoRefresh implements the CanAutoRefresh method
+func (m *MockBrokerClient) CanAutoRefresh() bool {
+	return true
+}
+
+// RefreshToken implements the RefreshToken method
+func (m *MockBrokerClient) RefreshToken() error {
+	return nil
+}
+
+// GetAccessToken implements the GetAccessToken method
+func (m *MockBrokerClient) GetAccessToken() string {
+	return "mock-access-token"
+}
+
+// GetRefreshToken implements the GetRefreshToken method
+func (m *MockBrokerClient) GetRefreshToken() string {
+	return "mock-refresh-token"
+}
+
+// SetRefreshToken implements the SetRefreshToken method
+func (m *MockBrokerClient) SetRefreshToken(token string) {
+	// No-op in mock
+}
+
+// GetLoginURL implements the GetLoginURL method
+func (m *MockBrokerClient) GetLoginURL(redirectURI string) string {
+	return "https://mock-login-url.com"
+}
+
+// GetAPIKey implements the GetAPIKey method
+func (m *MockBrokerClient) GetAPIKey() string {
+	return "mock-api-key"
+}
+
 // TestGetPortfolio tests retrieving the portfolio
 func TestGetPortfolio(t *testing.T) {
 	// Create a cache

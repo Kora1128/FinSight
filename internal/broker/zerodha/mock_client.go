@@ -43,6 +43,41 @@ func (m *MockClient) GetPositions(ctx context.Context) ([]models.Holding, error)
 	return m.Positions, nil
 }
 
+// CanAutoRefresh implements the CanAutoRefresh method
+func (m *MockClient) CanAutoRefresh() bool {
+	return true
+}
+
+// RefreshToken implements the RefreshToken method
+func (m *MockClient) RefreshToken() error {
+	return nil
+}
+
+// GetAccessToken implements the GetAccessToken method
+func (m *MockClient) GetAccessToken() string {
+	return "mock-zerodha-access-token"
+}
+
+// GetRefreshToken implements the GetRefreshToken method
+func (m *MockClient) GetRefreshToken() string {
+	return "mock-zerodha-refresh-token"
+}
+
+// SetRefreshToken implements the SetRefreshToken method
+func (m *MockClient) SetRefreshToken(token string) {
+	// No-op in mock
+}
+
+// GetLoginURL implements the GetLoginURL method
+func (m *MockClient) GetLoginURL(redirectURI string) string {
+	return "https://mock-zerodha-login-url.com"
+}
+
+// GetAPIKey implements the GetAPIKey method
+func (m *MockClient) GetAPIKey() string {
+	return "mock-zerodha-api-key"
+}
+
 // WithMockHoldings sets mock holdings data
 func (m *MockClient) WithMockHoldings(holdings []models.Holding) *MockClient {
 	m.Holdings = holdings

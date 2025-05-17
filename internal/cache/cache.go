@@ -103,3 +103,10 @@ func (c *Cache) ClearAll() {
 	defer c.mu.Unlock()
 	c.Flush()
 }
+
+// Delete removes an item from the cache
+func (c *Cache) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Cache.Delete(key)
+}
