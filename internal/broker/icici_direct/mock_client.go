@@ -17,6 +17,9 @@ type MockClient struct {
 	PositionsError error
 }
 
+// Ensure MockClient implements ICICIClient interface
+var _ ICICIClient = (*MockClient)(nil)
+
 // NewMockClient creates a new mock ICICI Direct client
 func NewMockClient() *MockClient {
 	return &MockClient{}

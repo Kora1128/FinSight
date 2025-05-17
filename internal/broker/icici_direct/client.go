@@ -10,6 +10,13 @@ import (
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect/services"
 )
 
+// ICICIClient defines the interface for ICICI Direct client operations
+type ICICIClient interface {
+	Login(requestToken, apiSecret string) error
+	GetHoldings(ctx context.Context) ([]models.Holding, error)
+	GetPositions(ctx context.Context) ([]models.Holding, error)
+}
+
 // Client represents the ICICI Direct broker integration client
 type Client struct {
 	apiKey    string
