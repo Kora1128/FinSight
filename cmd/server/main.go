@@ -11,10 +11,10 @@ import (
 
 	"github.com/Kora1128/FinSight/internal/api/handlers"
 	"github.com/Kora1128/FinSight/internal/api/routes"
-	"github.com/Kora1128/FinSight/internal/broker/icici_direct"
-	"github.com/Kora1128/FinSight/internal/broker/zerodha"
+	"github.com/Kora1128/FinSight/internal/broker"
 	"github.com/Kora1128/FinSight/internal/cache"
 	"github.com/Kora1128/FinSight/internal/config"
+	"github.com/Kora1128/FinSight/internal/database"
 	"github.com/Kora1128/FinSight/internal/news"
 	"github.com/Kora1128/FinSight/internal/portfolio"
 )
@@ -25,6 +25,17 @@ func main() {
 
 	// Initialize cache
 	appCache := cache.New(cfg.CacheTTL, time.Hour)
+	
+	// Initialize database
+	db, err := database.New(database.Config{
+		URL:      cfg.SupabaseURL,
+		APIKey:   cfg.SupabaseAPIKey,
+		Password: cfg.SupabasePassword,
+	})
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
 
 	// Initialize news engine components
 	newsCache := news.NewRecommendationCache(news.CacheConfig{
@@ -35,16 +46,21 @@ func main() {
 	processor := news.NewProcessor(newsCache, cfg.OpenAIAPIKey)
 	fetcher := news.NewNewsFetcher()
 
-	// Initialize broker clients
-	zerodhaClient := zerodha.NewClient(cfg.ZerodhaAPIKey, cfg.ZerodhaAPISecret)
-	iciciClient := icici_direct.NewClient(cfg.ICICIAPIKey, cfg.ICICIAPISecret)
-
-	// Initialize portfolio service
-	portfolioService := portfolio.NewService(portfolio.ServiceConfig{
-		ZerodhaClient: zerodhaClient,
-		ICICIClient:   iciciClient,
-		Cache:         appCache,
-		CacheTTL:      cfg.CacheTTL,
+	// Initialize repositories
+	userRepo := database.NewUserRepo(db)
+	sessionRepo := database.NewSessionRepo(db)
+	brokerCredentialsRepo := database.NewBrokerCredentialsRepo(db)
+	portfolioRepo := database.NewPortfolioRepo(db)
+	
+	// Initialize broker manager
+	brokerManager := broker.NewBrokerManager(brokerCredentialsRepo, appCache, 24*time.Hour, 15*time.Minute)
+	
+	// Initialize user portfolio service
+	userPortfolioService := portfolio.NewUserService(portfolio.UserServiceConfig{
+		BrokerManager:       brokerManager,
+		PortfolioRepository: portfolioRepo,
+		AccessTokenCache:    appCache, 
+		AccessTokenCacheTTL: cfg.CacheTTL,
 	})
 
 	// Set up background context for periodic news fetching
@@ -75,11 +91,17 @@ func main() {
 
 	// Create handlers
 	newsHandler := handlers.NewNewsHandler(processor, fetcher)
-	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
-	authHandler := handlers.NewAuthHandler(appCache, zerodhaClient, iciciClient, 24*time.Hour)
+	userPortfolioHandler := handlers.NewUserPortfolioHandler(userPortfolioService)
+	sessionHandler := handlers.NewSessionHandler(appCache, brokerManager, 24*time.Hour)
 	
 	// Initialize router with routes
-	router := routes.SetupRouter(newsHandler, portfolioHandler, authHandler, appCache)
+	router := routes.SetupRouter(
+		newsHandler, 
+		userPortfolioHandler,
+		sessionHandler, 
+		appCache,
+		sessionRepo,
+	)
 
 	// Create HTTP server
 	srv := &http.Server{

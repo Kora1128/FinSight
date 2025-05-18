@@ -10,10 +10,10 @@ type ZerodhaLoginRequest struct {
 
 // ICICILoginRequest represents the request for ICICI Direct login
 type ICICILoginRequest struct {
-	APIKey    string `json:"apiKey" binding:"required"`
-	APISecret string `json:"apiSecret" binding:"required"`
-	Password  string `json:"password" binding:"required"`
-	RedirectURI string `json:"redirectUri,omitempty"`
+	APIKey       string `json:"apiKey" binding:"required"`
+	APISecret    string `json:"apiSecret" binding:"required"`
+	RequestToken string `json:"requestToken" binding:"required"`
+	RedirectURI  string `json:"redirectUri,omitempty"`
 }
 
 // LoginResponse represents the response for login endpoints
