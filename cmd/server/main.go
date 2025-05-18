@@ -25,7 +25,7 @@ func main() {
 
 	// Initialize cache
 	appCache := cache.New(cfg.CacheTTL, time.Hour)
-	
+
 	// Initialize database
 	db, err := database.New(database.Config{
 		ConnString: cfg.SupabaseURL,
@@ -48,15 +48,15 @@ func main() {
 	sessionRepo := database.NewSessionRepo(db)
 	brokerCredentialsRepo := database.NewBrokerCredentialsRepo(db)
 	portfolioRepo := database.NewPortfolioRepo(db)
-	
+
 	// Initialize broker manager
 	brokerManager := broker.NewBrokerManager(brokerCredentialsRepo, appCache, 24*time.Hour, 15*time.Minute)
-	
+
 	// Initialize user portfolio service
 	userPortfolioService := portfolio.NewUserService(portfolio.UserServiceConfig{
 		BrokerManager:       brokerManager,
 		PortfolioRepository: portfolioRepo,
-		AccessTokenCache:    appCache, 
+		AccessTokenCache:    appCache,
 		AccessTokenCacheTTL: cfg.CacheTTL,
 	})
 
@@ -90,12 +90,12 @@ func main() {
 	newsHandler := handlers.NewNewsHandler(processor, fetcher)
 	userPortfolioHandler := handlers.NewUserPortfolioHandler(userPortfolioService)
 	sessionHandler := handlers.NewSessionHandler(appCache, brokerManager, 24*time.Hour)
-	
+
 	// Initialize router with routes
 	router := routes.SetupRouter(
-		newsHandler, 
+		newsHandler,
 		userPortfolioHandler,
-		sessionHandler, 
+		sessionHandler,
 		appCache,
 		sessionRepo,
 	)

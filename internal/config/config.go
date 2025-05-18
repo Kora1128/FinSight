@@ -14,15 +14,6 @@ type Config struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 
-	// Zerodha API configuration
-	ZerodhaAPIKey    string
-	ZerodhaAPISecret string
-
-	// ICICI Direct API configuration
-	ICICIAPIKey    string
-	ICICIAPISecret string
-	ICICIPassword  string
-
 	// OpenAI configuration
 	OpenAIAPIKey string
 
@@ -35,8 +26,7 @@ type Config struct {
 	SupabasePassword string
 
 	// News configuration
-	NewsRefreshInterval time.Duration
-	TrustedSources      []string
+	TrustedSources []string
 }
 
 // New creates a new Config instance with values from environment variables
@@ -48,29 +38,19 @@ func New() *Config {
 		ReadTimeout:  getDurationEnv("APP_READ_TIMEOUT", 10*time.Second),
 		WriteTimeout: getDurationEnv("APP_WRITE_TIMEOUT", 10*time.Second),
 
-		// Zerodha API configuration
-		ZerodhaAPIKey:    getEnv("ZERODHA_API_KEY", ""),
-		ZerodhaAPISecret: getEnv("ZERODHA_API_SECRET", ""),
-
-		// ICICI Direct API configuration
-		ICICIAPIKey:    getEnv("ICICI_API_KEY", ""),
-		ICICIAPISecret: getEnv("ICICI_API_SECRET", ""),
-		ICICIPassword:  getEnv("ICICI_PASSWORD", ""),
-
 		// OpenAI configuration
 		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
 
 		// Cache configuration
 		CacheTTL: getDurationEnv("CACHE_TTL", 15*time.Minute),
-		
+
 		// Database configuration (Supabase)
 		SupabaseURL:      getEnv("SUPABASE_URL", ""),
 		SupabaseAPIKey:   getEnv("SUPABASE_API_KEY", ""),
 		SupabasePassword: getEnv("SUPABASE_PASSWORD", ""),
 
 		// News configuration
-		NewsRefreshInterval: getDurationEnv("NEWS_REFRESH_INTERVAL", 24*time.Hour),
-		TrustedSources:      getTrustedSources(),
+		TrustedSources: getTrustedSources(),
 	}
 
 	return config
