@@ -28,9 +28,7 @@ func main() {
 	
 	// Initialize database
 	db, err := database.New(database.Config{
-		URL:      cfg.SupabaseURL,
-		APIKey:   cfg.SupabaseAPIKey,
-		Password: cfg.SupabasePassword,
+		ConnString: cfg.SupabaseURL,
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -47,7 +45,6 @@ func main() {
 	fetcher := news.NewNewsFetcher()
 
 	// Initialize repositories
-	userRepo := database.NewUserRepo(db)
 	sessionRepo := database.NewSessionRepo(db)
 	brokerCredentialsRepo := database.NewBrokerCredentialsRepo(db)
 	portfolioRepo := database.NewPortfolioRepo(db)

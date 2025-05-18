@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Kora1128/FinSight/internal/broker/icici_direct"
-	"github.com/Kora1128/FinSight/internal/broker/zerodha"
+	"github.com/Kora1128/FinSight/internal/broker/types"
 	"github.com/Kora1128/FinSight/internal/cache"
+	"github.com/Kora1128/FinSight/internal/repository"
 )
 
 // ClientType represents the type of broker client
@@ -32,8 +32,8 @@ type ClientCredentials struct {
 // ClientRegistry holds user-specific broker clients
 type ClientRegistry struct {
 	userID        string
-	zerodhaClient Client
-	iciciClient   Client
+	zerodhaClient types.Client
+	iciciClient   types.Client
 	createdAt     time.Time
 	lastAccessed  time.Time
 	lastRefreshed time.Time
@@ -41,35 +41,37 @@ type ClientRegistry struct {
 
 // BrokerManager manages the creation and refreshing of broker clients
 type BrokerManager struct {
-	credentialsRepo CredentialsRepository
-	cache           *cache.Cache               // Cache only for tokens that need quick access
+	credentialsRepo repository.BrokerCredentialsRepository
+	cache           *cache.Cache // Cache only for tokens that need quick access
 	registry        map[string]*ClientRegistry // Map from userID to ClientRegistry
 	mu              sync.RWMutex
 	maxAge          time.Duration // Maximum age before a client is considered stale
 	refreshInterval time.Duration
+	factory         ClientFactory
 }
 
 // NewBrokerManager creates a new BrokerManager
-func NewBrokerManager(credentialsRepo CredentialsRepository, cache *cache.Cache, maxAge, refreshInterval time.Duration) *BrokerManager {
+func NewBrokerManager(credentialsRepo repository.BrokerCredentialsRepository, cache *cache.Cache, maxAge, refreshInterval time.Duration) *BrokerManager {
 	manager := &BrokerManager{
 		credentialsRepo: credentialsRepo,
 		cache:           cache,
 		registry:        make(map[string]*ClientRegistry),
 		maxAge:          maxAge,
 		refreshInterval: refreshInterval,
+		factory:         &DefaultClientFactory{},
 	}
-
+	
 	// Start a background goroutine to periodically refresh tokens
 	go manager.startRefreshWorker()
-
+	
 	return manager
 }
 
 // GetOrCreateClient gets an existing client or creates a new one based on the provided credentials
-func (m *BrokerManager) GetOrCreateClient(clientType ClientType, creds ClientCredentials) (Client, error) {
+func (m *BrokerManager) GetOrCreateClient(clientType ClientType, creds ClientCredentials) (types.Client, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
+	
 	// Check if we already have a registry for this user
 	registry, exists := m.registry[creds.UserID]
 	if !exists {
@@ -81,74 +83,74 @@ func (m *BrokerManager) GetOrCreateClient(clientType ClientType, creds ClientCre
 		}
 		m.registry[creds.UserID] = registry
 	}
-
+	
 	// Update last accessed time
 	registry.lastAccessed = time.Now()
-
+	
 	switch clientType {
 	case ClientTypeZerodha:
 		if registry.zerodhaClient != nil {
 			return registry.zerodhaClient, nil
 		}
-
+		
 		// Create a new Zerodha client
-		client := zerodha.NewClient(creds.APIKey, creds.APISecret)
-
+		client := m.factory.CreateZerodhaClient(creds.APIKey, creds.APISecret)
+		
 		// Authenticate if request token is provided
 		if creds.RequestToken != "" {
 			if err := client.Login(creds.RequestToken, creds.APISecret); err != nil {
 				return nil, fmt.Errorf("failed to login to Zerodha: %w", err)
 			}
-
+			
 			// Store the token in database
 			err := m.credentialsRepo.UpdateAccessToken(creds.UserID, string(ClientTypeZerodha), client.GetAccessToken(), time.Now().Add(m.maxAge))
 			if err != nil {
 				return nil, fmt.Errorf("failed to update access token in database: %w", err)
 			}
-
+			
 			// Also keep in cache for quick access
 			tokenKey := fmt.Sprintf("zerodha_token:%s", creds.UserID)
 			m.cache.Set(tokenKey, client.GetAccessToken(), m.maxAge)
 		}
-
+		
 		registry.zerodhaClient = client
 		return client, nil
-
+		
 	case ClientTypeICICIDirect:
 		if registry.iciciClient != nil {
 			return registry.iciciClient, nil
 		}
-
+		
 		// Create a new ICICI Direct client
-		client := icici_direct.NewClient(creds.APIKey, creds.APISecret)
-
+		client := m.factory.CreateICICIDirectClient(creds.APIKey, creds.APISecret)
+		
 		// Authenticate if request token is provided
 		if creds.RequestToken != "" {
 			if err := client.Login(creds.RequestToken, creds.APISecret); err != nil {
 				return nil, fmt.Errorf("failed to login to ICICI Direct: %w", err)
 			}
-
+			
 			// Store the token in database
 			err := m.credentialsRepo.UpdateAccessToken(creds.UserID, string(ClientTypeICICIDirect), client.GetAccessToken(), time.Now().Add(m.maxAge))
 			if err != nil {
 				return nil, fmt.Errorf("failed to update access token in database: %w", err)
 			}
-
+			
 			// Also keep in cache for quick access
 			tokenKey := fmt.Sprintf("icici_token:%s", creds.UserID)
 			m.cache.Set(tokenKey, client.GetAccessToken(), m.maxAge)
 		}
-
+		
 		registry.iciciClient = client
 		return client, nil
-
+		
 	default:
 		return nil, fmt.Errorf("unknown client type: %s", clientType)
 	}
 }
 
 // GetClient returns a client for the given user and client type, if it exists
-func (m *BrokerManager) GetClient(userID string, clientType ClientType) (Client, bool) {
+func (m *BrokerManager) GetClient(userID string, clientType ClientType) (types.Client, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

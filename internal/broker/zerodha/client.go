@@ -5,13 +5,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Kora1128/FinSight/internal/broker"
+	"github.com/Kora1128/FinSight/internal/broker/types"
 	"github.com/Kora1128/FinSight/internal/models"
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 )
 
-// Ensure Client implements broker.Client interface
-var _ broker.Client = (*Client)(nil)
+// Ensure Client implements types.Client interface
+var _ types.Client = (*Client)(nil)
 
 // Client represents the Zerodha broker integration client
 type Client struct {

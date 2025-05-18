@@ -5,14 +5,14 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Kora1128/FinSight/internal/broker"
+	"github.com/Kora1128/FinSight/internal/broker/types"
 	"github.com/Kora1128/FinSight/internal/models"
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect"
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect/services"
 )
 
-// Ensure Client implements broker.Client interface
-var _ broker.Client = (*Client)(nil)
+// Ensure Client implements types.Client interface
+var _ types.Client = (*Client)(nil)
 
 // Client represents the ICICI Direct broker integration client
 type Client struct {
@@ -42,7 +42,7 @@ func (c *Client) Login(requestToken, apiSecret string) error {
 	customerService := services.NewCustomerService(c.client)
 	resp, err := customerService.GetCustomerDetails(requestToken)
 	if err == nil && resp != nil {
-		c.accessToken = requestToken // Store the token
+		c.accessToken = requestToken                 // Store the token
 		c.expiresAt = time.Now().Add(12 * time.Hour) // ICICI tokens typically expire in 12 hours
 	}
 	return err
@@ -63,7 +63,7 @@ func (c *Client) RefreshToken() error {
 	if c.accessToken == "" || c.apiSecret == "" {
 		return errors.New("missing credentials for token refresh")
 	}
-	
+
 	// ICICI Direct may have a specific refresh token API
 	// This is a simplified implementation
 	customerService := services.NewCustomerService(c.client)
@@ -86,7 +86,7 @@ func (c *Client) GetLoginURL(redirectURI string) string {
 		// Use default redirect URI if none provided
 		redirectURI = "https://finsight.app/auth/icici/callback"
 	}
-	
+
 	// ICICI Direct may have a specific method for generating login URLs
 	// This is a simplified implementation
 	return "https://secure.icicidirect.com/trading/login?api_key=" + c.apiKey + "&redirect_uri=" + redirectURI

@@ -6,20 +6,11 @@ import (
 	"time"
 
 	"github.com/Kora1128/FinSight/internal/models"
+	"github.com/Kora1128/FinSight/internal/repository"
 )
 
-// BrokerCredentials represents a row in the broker_credentials table
-type BrokerCredentials struct {
-	ID          int64
-	UserID      string
-	BrokerType  string
-	APIKey      string
-	APISecret   string
-	AccessToken string
-	TokenExpiry time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
+// Ensure BrokerCredentialsRepo implements repository.BrokerCredentialsRepository
+var _ repository.BrokerCredentialsRepository = (*BrokerCredentialsRepo)(nil)
 
 // BrokerCredentialsRepo handles broker credentials operations in the database
 type BrokerCredentialsRepo struct {
@@ -63,7 +54,7 @@ func (r *BrokerCredentialsRepo) SaveCredentials(userID string, brokerType string
 
 // GetCredentials retrieves broker credentials from the database
 func (r *BrokerCredentialsRepo) GetCredentials(userID string, brokerType string) (*models.Credentials, error) {
-	credentials := &BrokerCredentials{}
+	credentials := &models.Credentials{}
 	err := r.db.QueryRow(
 		"SELECT id, user_id, broker_type, api_key, api_secret, access_token, token_expiry, created_at, updated_at FROM broker_credentials WHERE user_id = $1 AND broker_type = $2",
 		userID, brokerType,
@@ -86,18 +77,7 @@ func (r *BrokerCredentialsRepo) GetCredentials(userID string, brokerType string)
 		return nil, err
 	}
 
-	// Convert to broker.Credentials
-	return &models.Credentials{
-		ID:          credentials.ID,
-		UserID:      credentials.UserID,
-		BrokerType:  credentials.BrokerType,
-		APIKey:      credentials.APIKey,
-		APISecret:   credentials.APISecret,
-		AccessToken: credentials.AccessToken,
-		TokenExpiry: credentials.TokenExpiry,
-		CreatedAt:   credentials.CreatedAt,
-		UpdatedAt:   credentials.UpdatedAt,
-	}, nil
+	return credentials, nil
 }
 
 // UpdateAccessToken updates the access token and expiry time for broker credentials
@@ -152,7 +132,7 @@ func (r *BrokerCredentialsRepo) GetAccessToken(userID string, brokerType string)
 }
 
 // GetCredentialsForAllUsers retrieves all broker credentials from the database
-func (r *BrokerCredentialsRepo) GetCredentialsForAllUsers() ([]*BrokerCredentials, error) {
+func (r *BrokerCredentialsRepo) GetCredentialsForAllUsers() ([]*models.Credentials, error) {
 	rows, err := r.db.Query(
 		"SELECT id, user_id, broker_type, api_key, api_secret, access_token, token_expiry, created_at, updated_at FROM broker_credentials",
 	)
@@ -161,9 +141,9 @@ func (r *BrokerCredentialsRepo) GetCredentialsForAllUsers() ([]*BrokerCredential
 	}
 	defer rows.Close()
 
-	var credentials []*BrokerCredentials
+	var credentials []*models.Credentials
 	for rows.Next() {
-		cred := &BrokerCredentials{}
+		cred := &models.Credentials{}
 		err := rows.Scan(
 			&cred.ID,
 			&cred.UserID,
@@ -189,7 +169,7 @@ func (r *BrokerCredentialsRepo) GetCredentialsForAllUsers() ([]*BrokerCredential
 }
 
 // GetExpiredTokens retrieves credentials with expired tokens
-func (r *BrokerCredentialsRepo) GetExpiredTokens() ([]*BrokerCredentials, error) {
+func (r *BrokerCredentialsRepo) GetExpiredTokens() ([]*models.Credentials, error) {
 	rows, err := r.db.Query(
 		"SELECT id, user_id, broker_type, api_key, api_secret, access_token, token_expiry, created_at, updated_at FROM broker_credentials WHERE token_expiry IS NOT NULL AND token_expiry < $1",
 		time.Now(),
@@ -199,9 +179,9 @@ func (r *BrokerCredentialsRepo) GetExpiredTokens() ([]*BrokerCredentials, error)
 	}
 	defer rows.Close()
 
-	var credentials []*BrokerCredentials
+	var credentials []*models.Credentials
 	for rows.Next() {
-		cred := &BrokerCredentials{}
+		cred := &models.Credentials{}
 		err := rows.Scan(
 			&cred.ID,
 			&cred.UserID,

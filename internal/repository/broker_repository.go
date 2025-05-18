@@ -1,16 +1,18 @@
-package broker
+package repository
 
 import (
 	"time"
+
+	"github.com/Kora1128/FinSight/internal/models"
 )
 
-// CredentialsRepository defines the interface for storing and retrieving broker credentials
-type CredentialsRepository interface {
+// BrokerCredentialsRepository defines the interface for storing and retrieving broker credentials
+type BrokerCredentialsRepository interface {
 	// SaveCredentials saves broker credentials to the repository
 	SaveCredentials(userID string, brokerType string, apiKey string, apiSecret string) error
 
 	// GetCredentials retrieves broker credentials from the repository
-	GetCredentials(userID string, brokerType string) (*Credentials, error)
+	GetCredentials(userID string, brokerType string) (*models.Credentials, error)
 
 	// UpdateAccessToken updates the access token and expiry time for broker credentials
 	UpdateAccessToken(userID string, brokerType string, accessToken string, expiryTime time.Time) error
@@ -22,8 +24,8 @@ type CredentialsRepository interface {
 	DeleteCredentials(userID string, brokerType string) error
 
 	// GetCredentialsForAllUsers retrieves all broker credentials from the repository
-	GetCredentialsForAllUsers() ([]*Credentials, error)
+	GetCredentialsForAllUsers() ([]*models.Credentials, error)
 
 	// GetExpiredTokens retrieves credentials with expired tokens
-	GetExpiredTokens() ([]*Credentials, error)
+	GetExpiredTokens() ([]*models.Credentials, error)
 }
