@@ -3,9 +3,11 @@ package database
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Kora1128/FinSight/internal/models"
+	"github.com/google/uuid"
 )
 
 // UserRepo handles user operations in the database
@@ -19,10 +21,10 @@ func NewUserRepo(db *DB) *UserRepo {
 }
 
 // CreateUser creates a new user in the database
-func (r *UserRepo) CreateUser(userID string) error {
+func (r *UserRepo) CreateUser(userID string, email string) error {
 	_, err := r.db.Exec(
-		"INSERT INTO users (user_id) VALUES ($1)",
-		userID,
+		"INSERT INTO users (user_id, email) VALUES ($1, $2)",
+		userID, email,
 	)
 	return err
 }
@@ -43,6 +45,45 @@ func (r *UserRepo) GetUser(userID string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// GetUserByEmail checks if a user exists with the given email
+func (r *UserRepo) GetUserByEmail(email string) (string, bool, error) {
+	var userID string
+	err := r.db.QueryRow(
+		"SELECT user_id FROM users WHERE email = $1",
+		email,
+	).Scan(&userID)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+
+	return userID, true, nil
+}
+
+// FindOrCreateUserByEmail finds a user by email or creates one if not found
+func (r *UserRepo) FindOrCreateUserByEmail(email string) (string, error) {
+	// First try to find the user
+	userID, exists, err := r.GetUserByEmail(email)
+	if err != nil {
+		return "", fmt.Errorf("error checking for existing user: %w", err)
+	}
+	
+	if exists {
+		return userID, nil
+	}
+	
+	// User doesn't exist, create a new one
+	newUserID := uuid.New().String()
+	if err := r.CreateUser(newUserID, email); err != nil {
+		return "", fmt.Errorf("error creating new user: %w", err)
+	}
+	
+	return newUserID, nil
 }
 
 // UpdateLastAccessed updates the last_accessed_at field for a user
@@ -77,9 +118,12 @@ func (r *SessionRepo) CreateSession(session *models.UserSession) error {
 func (r *SessionRepo) GetSession(sessionID string) (*models.UserSession, error) {
 	session := &models.UserSession{}
 	err := r.db.QueryRow(
-		"SELECT session_id, user_id, created_at, last_accessed_at, expires_at FROM sessions WHERE session_id = $1",
+		`SELECT s.session_id, s.user_id, s.created_at, s.last_accessed_at, s.expires_at, u.email 
+		FROM sessions s
+		JOIN users u ON s.user_id = u.user_id
+		WHERE s.session_id = $1`,
 		sessionID,
-	).Scan(&session.SessionID, &session.UserID, &session.CreatedAt, &session.LastAccessedAt, &session.ExpiresAt)
+	).Scan(&session.SessionID, &session.UserID, &session.CreatedAt, &session.LastAccessedAt, &session.ExpiresAt, &session.Email)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -110,9 +154,12 @@ func (r *SessionRepo) GetSession(sessionID string) (*models.UserSession, error) 
 func (r *SessionRepo) GetUserSession(userID string) (*models.UserSession, error) {
 	session := &models.UserSession{}
 	err := r.db.QueryRow(
-		"SELECT session_id, user_id, created_at, last_accessed_at, expires_at FROM sessions WHERE user_id = $1",
+		`SELECT s.session_id, s.user_id, s.created_at, s.last_accessed_at, s.expires_at, u.email 
+		FROM sessions s
+		JOIN users u ON s.user_id = u.user_id
+		WHERE s.user_id = $1`,
 		userID,
-	).Scan(&session.SessionID, &session.UserID, &session.CreatedAt, &session.LastAccessedAt, &session.ExpiresAt)
+	).Scan(&session.SessionID, &session.UserID, &session.CreatedAt, &session.LastAccessedAt, &session.ExpiresAt, &session.Email)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

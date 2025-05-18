@@ -6,30 +6,100 @@ import (
 
 	"github.com/Kora1128/FinSight/internal/broker"
 	"github.com/Kora1128/FinSight/internal/cache"
+	"github.com/Kora1128/FinSight/internal/database"
 	"github.com/Kora1128/FinSight/internal/models"
 	"github.com/gin-gonic/gin"
 )
 
 // SessionHandler handles user session-related HTTP requests
 type SessionHandler struct {
-	cache         *cache.Cache
+	cache         *cache.Cache   // Only used for temporary storage
+	sessionRepo   *database.SessionRepo
+	userRepo      *database.UserRepo
 	brokerManager *broker.BrokerManager
 	sessionTTL    time.Duration
 }
 
 // NewSessionHandler creates a new session handler
-func NewSessionHandler(cache *cache.Cache, brokerManager *broker.BrokerManager, sessionTTL time.Duration) *SessionHandler {
+func NewSessionHandler(
+	cache *cache.Cache,
+	sessionRepo *database.SessionRepo,
+	userRepo *database.UserRepo,
+	brokerManager *broker.BrokerManager,
+	sessionTTL time.Duration,
+) *SessionHandler {
 	return &SessionHandler{
 		cache:         cache,
+		sessionRepo:   sessionRepo,
+		userRepo:      userRepo,
 		brokerManager: brokerManager,
 		sessionTTL:    sessionTTL,
 	}
 }
 
+// CreateSessionRequest represents the request payload for session creation
+type CreateSessionRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
 // CreateSession creates a new user session
 func (h *SessionHandler) CreateSession(c *gin.Context) {
-	session := models.NewUserSession(h.sessionTTL)
-	h.cache.Set("session:"+session.UserID, session, h.sessionTTL)
+	var req CreateSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.SessionResponse{
+			Success: false,
+			Error:   "Invalid request format: " + err.Error(),
+		})
+		return
+	}
+	
+	// Find existing session for this email if any
+	userID, exists, err := h.userRepo.GetUserByEmail(req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.SessionResponse{
+			Success: false,
+			Error:   "Failed to check for existing user: " + err.Error(),
+		})
+		return
+	}
+	
+	// If user exists, check for an active session
+	if exists {
+		existingSession, err := h.sessionRepo.GetUserSession(userID)
+		if err == nil && existingSession != nil && existingSession.IsValid() {
+			// Existing valid session found, update last accessed time
+			_ = h.sessionRepo.UpdateLastAccessed(existingSession.SessionID)
+			_ = h.userRepo.UpdateLastAccessed(userID)
+			c.JSON(http.StatusOK, models.SessionResponse{
+				Success: true,
+				Data:    existingSession.GetInfo(),
+			})
+			return
+		}
+	}
+	
+	// Get or create user ID
+	userID, err = h.userRepo.FindOrCreateUserByEmail(req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.SessionResponse{
+			Success: false,
+			Error:   "Failed to process user account: " + err.Error(),
+		})
+		return
+	}
+	
+	// Create a new session
+	session := models.NewUserSession(req.Email, h.sessionTTL)
+	session.UserID = userID  // Use the found or created user ID
+	
+	// Create session in the database
+	if err := h.sessionRepo.CreateSession(session); err != nil {
+		c.JSON(http.StatusInternalServerError, models.SessionResponse{
+			Success: false,
+			Error:   "Failed to create session: " + err.Error(),
+		})
+		return
+	}
 	
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
@@ -48,9 +118,17 @@ func (h *SessionHandler) GetSession(c *gin.Context) {
 		return
 	}
 	
-	sessionKey := "session:" + userID
-	sessionObj, found := h.cache.Get(sessionKey)
-	if !found {
+	// Get session from database
+	session, err := h.sessionRepo.GetUserSession(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.SessionResponse{
+			Success: false,
+			Error:   "Failed to retrieve session: " + err.Error(),
+		})
+		return
+	}
+	
+	if session == nil {
 		c.JSON(http.StatusNotFound, models.SessionResponse{
 			Success: false,
 			Error:   "Session not found",
@@ -58,9 +136,10 @@ func (h *SessionHandler) GetSession(c *gin.Context) {
 		return
 	}
 	
-	session := sessionObj.(*models.UserSession)
 	if !session.IsValid() {
-		h.cache.Delete(sessionKey)
+		// Delete the expired session
+		_ = h.sessionRepo.DeleteSession(session.SessionID)
+		
 		c.JSON(http.StatusUnauthorized, models.SessionResponse{
 			Success: false,
 			Error:   "Session expired",
@@ -68,7 +147,9 @@ func (h *SessionHandler) GetSession(c *gin.Context) {
 		return
 	}
 	
-	session.Touch()
+	// Update last accessed time
+	_ = h.sessionRepo.UpdateLastAccessed(session.SessionID)
+	
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
 		Data:    session.GetInfo(),
@@ -87,9 +168,16 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 	}
 	
 	// Check if session exists
-	sessionKey := "session:" + req.UserID
-	sessionObj, found := h.cache.Get(sessionKey)
-	if !found {
+	session, err := h.sessionRepo.GetUserSession(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.SessionResponse{
+			Success: false,
+			Error:   "Failed to retrieve session: " + err.Error(),
+		})
+		return
+	}
+	
+	if session == nil {
 		c.JSON(http.StatusNotFound, models.SessionResponse{
 			Success: false,
 			Error:   "Session not found",
@@ -97,9 +185,10 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		return
 	}
 	
-	session := sessionObj.(*models.UserSession)
 	if !session.IsValid() {
-		h.cache.Delete(sessionKey)
+		// Delete the expired session
+		_ = h.sessionRepo.DeleteSession(session.SessionID)
+		
 		c.JSON(http.StatusUnauthorized, models.SessionResponse{
 			Success: false,
 			Error:   "Session expired",
@@ -107,10 +196,7 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		return
 	}
 	
-	// Update session
-	session.Touch()
-	
-	// Connect to broker
+	// Connect to broker and store credentials in database
 	clientType := broker.ClientType(req.BrokerType)
 	creds := broker.ClientCredentials{
 		UserID:       req.UserID,
@@ -120,7 +206,7 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		Password:     req.Password,
 	}
 	
-	_, err := h.brokerManager.GetOrCreateClient(clientType, creds)
+	_, err = h.brokerManager.GetOrCreateClient(clientType, creds)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.SessionResponse{
 			Success: false,
@@ -129,20 +215,18 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		return
 	}
 	
-	// Update session with connection status
-	switch clientType {
-	case broker.ClientTypeZerodha:
-		session.ZerodhaConnected = true
-	case broker.ClientTypeICICIDirect:
-		session.ICICIConnected = true
-	}
+	// Update last accessed time
+	_ = h.sessionRepo.UpdateLastAccessed(session.SessionID)
 	
-	// Update session in cache
-	h.cache.Set(sessionKey, session, h.sessionTTL)
+	// Get the updated session information (with correct connection status)
+	updatedSession, _ := h.sessionRepo.GetUserSession(req.UserID)
+	if updatedSession == nil {
+		updatedSession = session // Fallback to previous session if something went wrong
+	}
 	
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
-		Data:    session.GetInfo(),
+		Data:    updatedSession.GetInfo(),
 	})
 }
 
@@ -160,9 +244,16 @@ func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 	}
 	
 	// Check if session exists
-	sessionKey := "session:" + userID
-	sessionObj, found := h.cache.Get(sessionKey)
-	if !found {
+	session, err := h.sessionRepo.GetUserSession(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.SessionResponse{
+			Success: false,
+			Error:   "Failed to retrieve session: " + err.Error(),
+		})
+		return
+	}
+	
+	if session == nil {
 		c.JSON(http.StatusNotFound, models.SessionResponse{
 			Success: false,
 			Error:   "Session not found",
@@ -170,9 +261,10 @@ func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 		return
 	}
 	
-	session := sessionObj.(*models.UserSession)
 	if !session.IsValid() {
-		h.cache.Delete(sessionKey)
+		// Delete the expired session
+		_ = h.sessionRepo.DeleteSession(session.SessionID)
+		
 		c.JSON(http.StatusUnauthorized, models.SessionResponse{
 			Success: false,
 			Error:   "Session expired",
@@ -180,26 +272,21 @@ func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 		return
 	}
 	
-	// Update session
-	session.Touch()
-	
-	// Disconnect from broker
+	// Disconnect from broker (this will remove credentials from database via repository)
 	clientType := broker.ClientType(brokerType)
 	h.brokerManager.RemoveClient(userID, clientType)
 	
-	// Update session with connection status
-	switch clientType {
-	case broker.ClientTypeZerodha:
-		session.ZerodhaConnected = false
-	case broker.ClientTypeICICIDirect:
-		session.ICICIConnected = false
-	}
+	// Update last accessed time
+	_ = h.sessionRepo.UpdateLastAccessed(session.SessionID)
 	
-	// Update session in cache
-	h.cache.Set(sessionKey, session, h.sessionTTL)
+	// Get the updated session information (with correct connection status)
+	updatedSession, _ := h.sessionRepo.GetUserSession(userID)
+	if updatedSession == nil {
+		updatedSession = session // Fallback to previous session if something went wrong
+	}
 	
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
-		Data:    session.GetInfo(),
+		Data:    updatedSession.GetInfo(),
 	})
 }

@@ -15,6 +15,7 @@ func SetupRouter(
 	sessionHandler *handlers.SessionHandler,
 	cache *cache.Cache,
 	sessionRepo *database.SessionRepo,
+	userRepo *database.UserRepo,
 ) *gin.Engine {
 	r := gin.New()
 
@@ -46,6 +47,7 @@ func SetupRouter(
 		userPortfolio := api.Group("/users/:userId/portfolio")
 		userPortfolio.Use(middleware.SessionAuth(middleware.SessionAuthConfig{
 			SessionRepo: sessionRepo,
+			UserRepo:    userRepo,
 		}))
 		{
 			userPortfolio.GET("", userPortfolioHandler.GetUserPortfolio)

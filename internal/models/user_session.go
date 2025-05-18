@@ -9,6 +9,7 @@ import (
 // UserSession represents a user session with broker credentials
 type UserSession struct {
 	UserID           string    `json:"userId"`
+	Email            string    `json:"email"`
 	SessionID        string    `json:"sessionId"`
 	ZerodhaConnected bool      `json:"zerodhaConnected"`
 	ICICIConnected   bool      `json:"iciciConnected"`
@@ -18,11 +19,12 @@ type UserSession struct {
 }
 
 // NewUserSession creates a new user session
-func NewUserSession(sessionDuration time.Duration) *UserSession {
+func NewUserSession(email string, sessionDuration time.Duration) *UserSession {
 	userID := uuid.New().String()
 	now := time.Now()
 	return &UserSession{
 		UserID:         userID,
+		Email:          email,
 		SessionID:      uuid.New().String(),
 		CreatedAt:      now,
 		LastAccessedAt: now,
@@ -43,6 +45,7 @@ func (s *UserSession) Touch() {
 // SessionInfo represents the public session information
 type SessionInfo struct {
 	UserID           string    `json:"userId"`
+	Email            string    `json:"email"`
 	ZerodhaConnected bool      `json:"zerodhaConnected"`
 	ICICIConnected   bool      `json:"iciciConnected"`
 	ExpiresAt        time.Time `json:"expiresAt"`
@@ -52,6 +55,7 @@ type SessionInfo struct {
 func (s *UserSession) GetInfo() SessionInfo {
 	return SessionInfo{
 		UserID:           s.UserID,
+		Email:            s.Email,
 		ZerodhaConnected: s.ZerodhaConnected,
 		ICICIConnected:   s.ICICIConnected,
 		ExpiresAt:        s.ExpiresAt,
