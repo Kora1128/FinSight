@@ -29,6 +29,11 @@ type Config struct {
 	// Cache configuration
 	CacheTTL time.Duration
 
+	// Database configuration (Supabase)
+	SupabaseURL      string
+	SupabaseAPIKey   string
+	SupabasePassword string
+
 	// News configuration
 	NewsRefreshInterval time.Duration
 	TrustedSources      []string
@@ -57,6 +62,11 @@ func New() *Config {
 
 		// Cache configuration
 		CacheTTL: getDurationEnv("CACHE_TTL", 15*time.Minute),
+		
+		// Database configuration (Supabase)
+		SupabaseURL:      getEnv("SUPABASE_URL", ""),
+		SupabaseAPIKey:   getEnv("SUPABASE_API_KEY", ""),
+		SupabasePassword: getEnv("SUPABASE_PASSWORD", ""),
 
 		// News configuration
 		NewsRefreshInterval: getDurationEnv("NEWS_REFRESH_INTERVAL", 24*time.Hour),

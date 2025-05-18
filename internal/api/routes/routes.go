@@ -3,14 +3,18 @@ package routes
 import (
 	"github.com/Kora1128/FinSight/internal/api/handlers"
 	"github.com/Kora1128/FinSight/internal/api/middleware"
+	"github.com/Kora1128/FinSight/internal/cache"
+	"github.com/Kora1128/FinSight/internal/database"
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRouter configures the API routes
 func SetupRouter(
 	newsHandler *handlers.NewsHandler,
-	portfolioHandler *handlers.PortfolioHandler,
-	authHandler *handlers.AuthHandler,
+	userPortfolioHandler *handlers.UserPortfolioHandler,
+	sessionHandler *handlers.SessionHandler,
+	cache *cache.Cache,
+	sessionRepo *database.SessionRepo,
 ) *gin.Engine {
 	r := gin.New()
 
@@ -22,21 +26,30 @@ func SetupRouter(
 	// API Routes
 	api := r.Group("/api/v1")
 	{
-		// Authentication routes
-		auth := api.Group("/login")
+		// User session routes
+		sessions := api.Group("/sessions")
 		{
-			auth.POST("/zerodha", authHandler.ZerodhaLogin)
-			auth.POST("/icici", authHandler.ICICILogin)
+			// Create a new session
+			sessions.POST("", sessionHandler.CreateSession)
+			
+			// Get session info
+			sessions.GET("/:userId", sessionHandler.GetSession)
+			
+			// Connect broker to session
+			sessions.POST("/connect", sessionHandler.ConnectBroker)
+			
+			// Disconnect broker from session
+			sessions.POST("/disconnect/:userId/:brokerType", sessionHandler.DisconnectBroker)
 		}
 
-		// User status
-		api.GET("/user/status", authHandler.GetUserStatus)
-
-		// Portfolio routes
-		portfolio := api.Group("/portfolio")
+		// User-specific portfolio routes - protected by session authentication
+		userPortfolio := api.Group("/users/:userId/portfolio")
+		userPortfolio.Use(middleware.SessionAuth(middleware.SessionAuthConfig{
+			SessionRepo: sessionRepo,
+		}))
 		{
-			portfolio.GET("", portfolioHandler.GetPortfolio)
-			portfolio.POST("/refresh", portfolioHandler.RefreshPortfolio)
+			userPortfolio.GET("", userPortfolioHandler.GetUserPortfolio)
+			userPortfolio.POST("/refresh", userPortfolioHandler.RefreshUserPortfolio)
 		}
 
 		// News/Recommendation routes

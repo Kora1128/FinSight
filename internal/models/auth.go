@@ -5,13 +5,15 @@ type ZerodhaLoginRequest struct {
 	APIKey       string `json:"apiKey" binding:"required"`
 	APISecret    string `json:"apiSecret" binding:"required"`
 	RequestToken string `json:"requestToken" binding:"required"`
+	RedirectURI  string `json:"redirectUri,omitempty"`
 }
 
 // ICICILoginRequest represents the request for ICICI Direct login
 type ICICILoginRequest struct {
-	APIKey    string `json:"apiKey" binding:"required"`
-	APISecret string `json:"apiSecret" binding:"required"`
-	Password  string `json:"password" binding:"required"`
+	APIKey       string `json:"apiKey" binding:"required"`
+	APISecret    string `json:"apiSecret" binding:"required"`
+	RequestToken string `json:"requestToken" binding:"required"`
+	RedirectURI  string `json:"redirectUri,omitempty"`
 }
 
 // LoginResponse represents the response for login endpoints
@@ -32,4 +34,10 @@ type UserStatusResponse struct {
 	Success bool       `json:"success"`
 	Data    UserStatus `json:"data"`
 	Error   string     `json:"error,omitempty"`
+}
+
+// ErrorResponse represents a generic error response
+type ErrorResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 }

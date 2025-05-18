@@ -5,20 +5,23 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Kora1128/FinSight/internal/broker"
+	"github.com/Kora1128/FinSight/internal/broker/types"
 	"github.com/Kora1128/FinSight/internal/models"
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect"
 	"github.com/Kora1128/icici-breezeconnect-go/breezeconnect/services"
 )
 
-// Ensure Client implements broker.Client interface
-var _ broker.Client = (*Client)(nil)
+// Ensure Client implements types.Client interface
+var _ types.Client = (*Client)(nil)
 
 // Client represents the ICICI Direct broker integration client
 type Client struct {
-	apiKey    string
-	apiSecret string
-	client    *breezeconnect.Client
+	apiKey       string
+	apiSecret    string
+	client       *breezeconnect.Client
+	accessToken  string
+	refreshToken string
+	expiresAt    time.Time
 }
 
 // NewClient creates a new ICICI Direct client with the provided API key and secret
@@ -37,8 +40,71 @@ func (c *Client) Login(requestToken, apiSecret string) error {
 		return errors.New("invalid request token or api secret")
 	}
 	customerService := services.NewCustomerService(c.client)
-	_, err := customerService.GetCustomerDetails(requestToken)
+	resp, err := customerService.GetCustomerDetails(requestToken)
+	if err == nil && resp != nil {
+		c.accessToken = requestToken                 // Store the token
+		c.expiresAt = time.Now().Add(12 * time.Hour) // ICICI tokens typically expire in 12 hours
+	}
 	return err
+}
+
+// CanAutoRefresh checks if the client can refresh the token automatically
+func (c *Client) CanAutoRefresh() bool {
+	return c.accessToken != "" && c.apiSecret != "" && time.Until(c.expiresAt) < 1*time.Hour
+}
+
+// RefreshToken attempts to refresh the authentication token
+func (c *Client) RefreshToken() error {
+	// Check if we need to refresh yet
+	if time.Until(c.expiresAt) > 1*time.Hour {
+		return nil // No need to refresh yet
+	}
+
+	if c.accessToken == "" || c.apiSecret == "" {
+		return errors.New("missing credentials for token refresh")
+	}
+
+	// ICICI Direct may have a specific refresh token API
+	// This is a simplified implementation
+	customerService := services.NewCustomerService(c.client)
+	_, err := customerService.GetCustomerDetails(c.accessToken)
+	if err == nil {
+		// Successfully refreshed, extend expiry
+		c.expiresAt = time.Now().Add(12 * time.Hour)
+	}
+	return err
+}
+
+// GetAccessToken returns the current access token
+func (c *Client) GetAccessToken() string {
+	return c.accessToken
+}
+
+// GetLoginURL returns the ICICI Direct login URL
+func (c *Client) GetLoginURL(redirectURI string) string {
+	if redirectURI == "" {
+		// Use default redirect URI if none provided
+		redirectURI = "https://finsight.app/auth/icici/callback"
+	}
+
+	// ICICI Direct may have a specific method for generating login URLs
+	// This is a simplified implementation
+	return "https://secure.icicidirect.com/trading/login?api_key=" + c.apiKey + "&redirect_uri=" + redirectURI
+}
+
+// GetAPIKey returns the API key
+func (c *Client) GetAPIKey() string {
+	return c.apiKey
+}
+
+// GetRefreshToken returns the refresh token
+func (c *Client) GetRefreshToken() string {
+	return c.refreshToken
+}
+
+// SetRefreshToken sets the refresh token
+func (c *Client) SetRefreshToken(token string) {
+	c.refreshToken = token
 }
 
 // GetHoldings fetches the current portfolio holdings from ICICI Direct and normalizes them into the common Holding struct
