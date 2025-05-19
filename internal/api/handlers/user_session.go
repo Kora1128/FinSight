@@ -13,7 +13,7 @@ import (
 
 // SessionHandler handles user session-related HTTP requests
 type SessionHandler struct {
-	cache         *cache.Cache   // Only used for temporary storage
+	cache         *cache.Cache // Only used for temporary storage
 	sessionRepo   *database.SessionRepo
 	userRepo      *database.UserRepo
 	brokerManager *broker.BrokerManager
@@ -52,7 +52,7 @@ func (h *SessionHandler) CreateSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Find existing session for this email if any
 	userID, exists, err := h.userRepo.GetUserByEmail(req.Email)
 	if err != nil {
@@ -62,7 +62,7 @@ func (h *SessionHandler) CreateSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// If user exists, check for an active session
 	if exists {
 		existingSession, err := h.sessionRepo.GetUserSession(userID)
@@ -77,7 +77,7 @@ func (h *SessionHandler) CreateSession(c *gin.Context) {
 			return
 		}
 	}
-	
+
 	// Get or create user ID
 	userID, err = h.userRepo.FindOrCreateUserByEmail(req.Email)
 	if err != nil {
@@ -87,11 +87,11 @@ func (h *SessionHandler) CreateSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Create a new session
 	session := models.NewUserSession(req.Email, h.sessionTTL)
-	session.UserID = userID  // Use the found or created user ID
-	
+	session.UserID = userID // Use the found or created user ID
+
 	// Create session in the database
 	if err := h.sessionRepo.CreateSession(session); err != nil {
 		c.JSON(http.StatusInternalServerError, models.SessionResponse{
@@ -100,7 +100,7 @@ func (h *SessionHandler) CreateSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
 		Data:    session.GetInfo(),
@@ -117,7 +117,7 @@ func (h *SessionHandler) GetSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Get session from database
 	session, err := h.sessionRepo.GetUserSession(userID)
 	if err != nil {
@@ -127,7 +127,7 @@ func (h *SessionHandler) GetSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if session == nil {
 		c.JSON(http.StatusNotFound, models.SessionResponse{
 			Success: false,
@@ -135,21 +135,21 @@ func (h *SessionHandler) GetSession(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if !session.IsValid() {
 		// Delete the expired session
 		_ = h.sessionRepo.DeleteSession(session.SessionID)
-		
+
 		c.JSON(http.StatusUnauthorized, models.SessionResponse{
 			Success: false,
 			Error:   "Session expired",
 		})
 		return
 	}
-	
+
 	// Update last accessed time
 	_ = h.sessionRepo.UpdateLastAccessed(session.SessionID)
-	
+
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
 		Data:    session.GetInfo(),
@@ -166,7 +166,7 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check if session exists
 	session, err := h.sessionRepo.GetUserSession(req.UserID)
 	if err != nil {
@@ -176,7 +176,7 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if session == nil {
 		c.JSON(http.StatusNotFound, models.SessionResponse{
 			Success: false,
@@ -184,20 +184,19 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if !session.IsValid() {
 		// Delete the expired session
 		_ = h.sessionRepo.DeleteSession(session.SessionID)
-		
+
 		c.JSON(http.StatusUnauthorized, models.SessionResponse{
 			Success: false,
 			Error:   "Session expired",
 		})
 		return
 	}
-	
+
 	// Connect to broker and store credentials in database
-	clientType := broker.ClientType(req.BrokerType)
 	creds := broker.ClientCredentials{
 		UserID:       req.UserID,
 		APIKey:       req.APIKey,
@@ -205,8 +204,8 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		RequestToken: req.RequestToken,
 		Password:     req.Password,
 	}
-	
-	_, err = h.brokerManager.GetOrCreateClient(clientType, creds)
+
+	_, err = h.brokerManager.CreateClient(req.BrokerType, creds)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.SessionResponse{
 			Success: false,
@@ -214,16 +213,16 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Update last accessed time
 	_ = h.sessionRepo.UpdateLastAccessed(session.SessionID)
-	
+
 	// Get the updated session information (with correct connection status)
 	updatedSession, _ := h.sessionRepo.GetUserSession(req.UserID)
 	if updatedSession == nil {
 		updatedSession = session // Fallback to previous session if something went wrong
 	}
-	
+
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
 		Data:    updatedSession.GetInfo(),
@@ -234,7 +233,7 @@ func (h *SessionHandler) ConnectBroker(c *gin.Context) {
 func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 	userID := c.Param("userId")
 	brokerType := c.Param("brokerType")
-	
+
 	if userID == "" || brokerType == "" {
 		c.JSON(http.StatusBadRequest, models.SessionResponse{
 			Success: false,
@@ -242,7 +241,7 @@ func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check if session exists
 	session, err := h.sessionRepo.GetUserSession(userID)
 	if err != nil {
@@ -252,7 +251,7 @@ func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if session == nil {
 		c.JSON(http.StatusNotFound, models.SessionResponse{
 			Success: false,
@@ -260,31 +259,30 @@ func (h *SessionHandler) DisconnectBroker(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if !session.IsValid() {
 		// Delete the expired session
 		_ = h.sessionRepo.DeleteSession(session.SessionID)
-		
+
 		c.JSON(http.StatusUnauthorized, models.SessionResponse{
 			Success: false,
 			Error:   "Session expired",
 		})
 		return
 	}
-	
+
 	// Disconnect from broker (this will remove credentials from database via repository)
-	clientType := broker.ClientType(brokerType)
-	h.brokerManager.RemoveClient(userID, clientType)
-	
+	h.brokerManager.RemoveClient(userID, brokerType)
+
 	// Update last accessed time
 	_ = h.sessionRepo.UpdateLastAccessed(session.SessionID)
-	
+
 	// Get the updated session information (with correct connection status)
 	updatedSession, _ := h.sessionRepo.GetUserSession(userID)
 	if updatedSession == nil {
 		updatedSession = session // Fallback to previous session if something went wrong
 	}
-	
+
 	c.JSON(http.StatusOK, models.SessionResponse{
 		Success: true,
 		Data:    updatedSession.GetInfo(),

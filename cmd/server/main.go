@@ -64,7 +64,7 @@ func main() {
 	portfolioRepo := database.NewPortfolioRepo(db)
 
 	// Initialize broker manager
-	brokerManager := broker.NewBrokerManager(brokerCredentialsRepo, appCache, 24*time.Hour, 15*time.Minute)
+	brokerManager := broker.NewBrokerManager(brokerCredentialsRepo, appCache, 24*time.Hour, 1*time.Hour)
 
 	// Initialize user portfolio service
 	userPortfolioService := portfolio.NewUserService(portfolio.UserServiceConfig{

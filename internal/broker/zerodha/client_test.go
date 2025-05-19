@@ -12,9 +12,13 @@ import (
 func TestNewClient(t *testing.T) {
 	apiKey := "test-api-key"
 	apiSecret := "test-api-secret"
-	client := NewClient(apiKey, apiSecret)
+	requestToken := "test-request-token"
+	client := NewClient(apiKey, apiSecret, requestToken)
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.kc)
+	assert.Equal(t, apiKey, client.apiKey)
+	assert.Equal(t, apiSecret, client.apiSecret)
+	assert.Equal(t, requestToken, client.requestToken)
 }
 
 func TestLogin(t *testing.T) {

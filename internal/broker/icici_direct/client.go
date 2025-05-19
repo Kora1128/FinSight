@@ -18,6 +18,7 @@ var _ types.Client = (*Client)(nil)
 type Client struct {
 	apiKey       string
 	apiSecret    string
+	requestToken string
 	client       *breezeconnect.Client
 	accessToken  string
 	refreshToken string
@@ -25,24 +26,25 @@ type Client struct {
 }
 
 // NewClient creates a new ICICI Direct client with the provided API key and secret
-func NewClient(apiKey, apiSecret string) *Client {
+func NewClient(apiKey, apiSecret, requestToken string) *Client {
 	client := breezeconnect.NewClient(apiKey, apiSecret)
 	return &Client{
-		apiKey:    apiKey,
-		apiSecret: apiSecret,
-		client:    client,
+		apiKey:       apiKey,
+		apiSecret:    apiSecret,
+		requestToken: requestToken,
+		client:       client,
 	}
 }
 
 // Login authenticates the user with ICICI Direct using the provided request token and apiSecret
-func (c *Client) Login(requestToken, apiSecret string) error {
-	if requestToken == "" || apiSecret == "" {
+func (c *Client) Login() error {
+	if c.requestToken == "" || c.apiSecret == "" {
 		return errors.New("invalid request token or api secret")
 	}
 	customerService := services.NewCustomerService(c.client)
-	resp, err := customerService.GetCustomerDetails(requestToken)
+	resp, err := customerService.GetCustomerDetails(c.requestToken)
 	if err == nil && resp != nil {
-		c.accessToken = requestToken                 // Store the token
+		c.accessToken = resp.Success.SessionToken    // Store the token
 		c.expiresAt = time.Now().Add(12 * time.Hour) // ICICI tokens typically expire in 12 hours
 	}
 	return err
@@ -75,36 +77,20 @@ func (c *Client) RefreshToken() error {
 	return err
 }
 
+// SetAccessToken sets the access token for the client
+func (c *Client) SetAccessToken(token string) {
+	c.accessToken = token
+	c.client.SetSessionKey(token)
+}
+
 // GetAccessToken returns the current access token
 func (c *Client) GetAccessToken() string {
 	return c.accessToken
 }
 
-// GetLoginURL returns the ICICI Direct login URL
-func (c *Client) GetLoginURL(redirectURI string) string {
-	if redirectURI == "" {
-		// Use default redirect URI if none provided
-		redirectURI = "https://finsight.app/auth/icici/callback"
-	}
-
-	// ICICI Direct may have a specific method for generating login URLs
-	// This is a simplified implementation
-	return "https://secure.icicidirect.com/trading/login?api_key=" + c.apiKey + "&redirect_uri=" + redirectURI
-}
-
 // GetAPIKey returns the API key
 func (c *Client) GetAPIKey() string {
 	return c.apiKey
-}
-
-// GetRefreshToken returns the refresh token
-func (c *Client) GetRefreshToken() string {
-	return c.refreshToken
-}
-
-// SetRefreshToken sets the refresh token
-func (c *Client) SetRefreshToken(token string) {
-	c.refreshToken = token
 }
 
 // GetHoldings fetches the current portfolio holdings from ICICI Direct and normalizes them into the common Holding struct

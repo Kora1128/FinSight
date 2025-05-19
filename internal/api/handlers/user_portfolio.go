@@ -41,11 +41,8 @@ func (h *UserPortfolioHandler) GetUserPortfolio(c *gin.Context) {
 		return
 	}
 
-	// Check if we should force refresh
-	forceRefresh := c.Query("refresh") == "true"
-
 	// Get the portfolio
-	portfolio, err := h.userPortfolioService.GetPortfolio(context.Background(), userID, forceRefresh, req.Type)
+	portfolio, err := h.userPortfolioService.GetPortfolio(context.Background(), userID, req.Type)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.PortfolioResponse{
 			Success: false,
@@ -82,7 +79,7 @@ func (h *UserPortfolioHandler) RefreshUserPortfolio(c *gin.Context) {
 	}
 
 	// Get the updated portfolio
-	portfolio, err := h.userPortfolioService.GetPortfolio(context.Background(), userID, false, "")
+	portfolio, err := h.userPortfolioService.GetPortfolio(context.Background(), userID, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.PortfolioResponse{
 			Success: false,

@@ -18,24 +18,26 @@ type Client struct {
 	kc           *kiteconnect.Client
 	apiKey       string
 	apiSecret    string
+	requestToken string
 	accessToken  string
 	refreshToken string
 	expiresAt    time.Time
 }
 
 // NewClient creates a new Zerodha client with the provided API key and secret
-func NewClient(apiKey, apiSecret string) *Client {
+func NewClient(apiKey, apiSecret, requestToken string) *Client {
 	kc := kiteconnect.New(apiKey)
 	return &Client{
-		kc:        kc,
-		apiKey:    apiKey,
-		apiSecret: apiSecret,
+		kc:           kc,
+		apiKey:       apiKey,
+		requestToken: requestToken,
+		apiSecret:    apiSecret,
 	}
 }
 
 // Login authenticates the user with Zerodha using the provided request token and apiSecret
-func (c *Client) Login(requestToken, apiSecret string) error {
-	user, err := c.kc.GenerateSession(requestToken, apiSecret)
+func (c *Client) Login() error {
+	user, err := c.kc.GenerateSession(c.requestToken, c.apiSecret)
 	if err != nil {
 		return err
 	}
@@ -71,33 +73,20 @@ func (c *Client) RefreshToken() error {
 	return nil
 }
 
+// SetAccessToken sets the access token for the client
+func (c *Client) SetAccessToken(token string) {
+	c.accessToken = token
+	c.kc.SetAccessToken(token)
+}
+
 // GetAccessToken returns the current access token
 func (c *Client) GetAccessToken() string {
 	return c.accessToken
 }
 
-// GetLoginURL returns the Zerodha login URL
-func (c *Client) GetLoginURL(redirectURI string) string {
-	if redirectURI == "" {
-		// Use default redirect URI if none provided
-		redirectURI = "https://finsight.app/auth/zerodha/callback"
-	}
-	return c.kc.GetLoginURL()
-}
-
 // GetAPIKey returns the API key
 func (c *Client) GetAPIKey() string {
 	return c.apiKey
-}
-
-// GetRefreshToken returns the refresh token
-func (c *Client) GetRefreshToken() string {
-	return c.refreshToken
-}
-
-// SetRefreshToken sets the refresh token
-func (c *Client) SetRefreshToken(token string) {
-	c.refreshToken = token
 }
 
 // GetHoldings fetches the current portfolio holdings from Zerodha and normalizes them into the common Holding struct

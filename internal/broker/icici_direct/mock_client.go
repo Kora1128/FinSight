@@ -58,21 +58,6 @@ func (m *MockClient) GetAccessToken() string {
 	return "mock-icici-access-token"
 }
 
-// GetRefreshToken implements the GetRefreshToken method
-func (m *MockClient) GetRefreshToken() string {
-	return "mock-icici-refresh-token"
-}
-
-// SetRefreshToken implements the SetRefreshToken method
-func (m *MockClient) SetRefreshToken(token string) {
-	// No-op in mock
-}
-
-// GetLoginURL implements the GetLoginURL method
-func (m *MockClient) GetLoginURL(redirectURI string) string {
-	return "https://mock-icici-login-url.com"
-}
-
 // GetAPIKey implements the GetAPIKey method
 func (m *MockClient) GetAPIKey() string {
 	return "mock-icici-api-key"
