@@ -97,8 +97,10 @@ var (
 var (
 	// ReliableSources contains names of sources considered highly reliable
 	ReliableSources = map[string]bool{
-		"MoneyControl":      true,
-		"Economic Times":    true,
-		"Business Standard": true,
+		"MoneyControl":                   true,
+		"Economic Times":                 true,
+		"Business Standard":              true,
+		"Business Standard Markets":      true,
+		"Business Standard Stock Market": true,
 	}
 )

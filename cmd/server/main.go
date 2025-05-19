@@ -78,7 +78,7 @@ func main() {
 
 	// Start periodic news fetching
 	go func() {
-		ticker := time.NewTicker(15 * time.Minute)
+		ticker := time.NewTicker(3 * time.Hour)
 		defer ticker.Stop()
 
 		for {
