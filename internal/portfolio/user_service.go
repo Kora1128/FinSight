@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Kora1128/FinSight/internal/broker"
-	"github.com/Kora1128/FinSight/internal/cache"
 	"github.com/Kora1128/FinSight/internal/models"
 )
 
@@ -13,16 +12,12 @@ import (
 type UserServiceConfig struct {
 	BrokerManager       *broker.BrokerManager
 	PortfolioRepository PortfolioRepository
-	AccessTokenCache    *cache.Cache // Only use cache for access tokens, not for portfolio data
-	AccessTokenCacheTTL time.Duration
 }
 
 // UserService manages portfolios for specific users
 type UserService struct {
 	brokerManager       *broker.BrokerManager
 	portfolioRepository PortfolioRepository
-	tokenCache          *cache.Cache
-	tokenCacheTTL       time.Duration
 }
 
 // NewUserService creates a new user-specific portfolio service
@@ -30,8 +25,6 @@ func NewUserService(config UserServiceConfig) *UserService {
 	return &UserService{
 		brokerManager:       config.BrokerManager,
 		portfolioRepository: config.PortfolioRepository,
-		tokenCache:          config.AccessTokenCache,
-		tokenCacheTTL:       config.AccessTokenCacheTTL,
 	}
 }
 

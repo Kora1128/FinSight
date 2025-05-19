@@ -20,6 +20,11 @@ type Config struct {
 
 // New creates a new database connection
 func New(config Config) (*DB, error) {
+	if config.ConnString == "" {
+		return nil, fmt.Errorf("database connection string is empty")
+	}
+	
+	log.Printf("Connecting to PostgreSQL database using direct connection string")
 	db, err := sql.Open("postgres", config.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -29,6 +34,7 @@ func New(config Config) (*DB, error) {
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
+	log.Printf("Connected to PostgreSQL database successfully")
 
 	// Initialize database
 	if err = initDB(db); err != nil {

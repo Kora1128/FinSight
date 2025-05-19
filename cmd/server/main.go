@@ -17,23 +17,37 @@ import (
 	"github.com/Kora1128/FinSight/internal/database"
 	"github.com/Kora1128/FinSight/internal/news"
 	"github.com/Kora1128/FinSight/internal/portfolio"
+	"github.com/joho/godotenv" // Import the package
 )
 
 func main() {
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Warning: Error loading .env file, using environment variables from OS")
+	}
+
 	// Load configuration
 	cfg := config.New()
 
 	// Initialize cache
 	appCache := cache.New(cfg.CacheTTL, time.Hour)
-	
+
 	// Initialize database
 	db, err := database.New(database.Config{
-		ConnString: cfg.SupabaseURL,
+		ConnString: cfg.DBConnectionString,
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Log Supabase client status
+	if cfg.SupabaseClient != nil {
+		log.Println("Supabase client is available for use")
+	} else {
+		log.Println("Warning: Supabase client is not initialized")
+	}
 
 	// Initialize news engine components
 	newsCache := news.NewRecommendationCache(news.CacheConfig{
@@ -48,16 +62,14 @@ func main() {
 	sessionRepo := database.NewSessionRepo(db)
 	brokerCredentialsRepo := database.NewBrokerCredentialsRepo(db)
 	portfolioRepo := database.NewPortfolioRepo(db)
-	
+
 	// Initialize broker manager
 	brokerManager := broker.NewBrokerManager(brokerCredentialsRepo, appCache, 24*time.Hour, 15*time.Minute)
-	
+
 	// Initialize user portfolio service
 	userPortfolioService := portfolio.NewUserService(portfolio.UserServiceConfig{
 		BrokerManager:       brokerManager,
 		PortfolioRepository: portfolioRepo,
-		AccessTokenCache:    appCache, 
-		AccessTokenCacheTTL: cfg.CacheTTL,
 	})
 
 	// Set up background context for periodic news fetching
@@ -91,16 +103,16 @@ func main() {
 	userPortfolioHandler := handlers.NewUserPortfolioHandler(userPortfolioService)
 	userRepo := database.NewUserRepo(db)
 	sessionHandler := handlers.NewSessionHandler(
-		appCache, 
+		appCache,
 		sessionRepo,
 		userRepo,
-		brokerManager, 
+		brokerManager,
 		24*time.Hour,
 	)
-	
+
 	// Initialize router with routes
 	router := routes.SetupRouter(
-		newsHandler, 
+		newsHandler,
 		userPortfolioHandler,
 		sessionHandler,
 		appCache, // Still keeping this for now in case other handlers need it
