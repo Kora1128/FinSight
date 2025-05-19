@@ -20,6 +20,11 @@ type Config struct {
 
 // New creates a new database connection
 func New(config Config) (*DB, error) {
+	if config.ConnString == "" {
+		return nil, fmt.Errorf("database connection string is empty")
+	}
+	
+	log.Printf("Connecting to PostgreSQL database using direct connection string")
 	db, err := sql.Open("postgres", config.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -29,13 +34,79 @@ func New(config Config) (*DB, error) {
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
+	log.Printf("Connected to PostgreSQL database successfully")
 
 	// Initialize database
 	if err = initDB(db); err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
+	
+	// Run migrations if needed
+	if err = migrateTables(db); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
 
 	return &DB{DB: db}, nil
+}
+
+// migrateTables performs any necessary migrations for existing tables
+func migrateTables(db *sql.DB) error {
+	// Check if email column exists in users table
+	var emailExists bool
+	err := db.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 
+			FROM information_schema.columns 
+			WHERE table_name='users' AND column_name='email'
+		)
+	`).Scan(&emailExists)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for email column: %w", err)
+	}
+
+	// If email column doesn't exist in an existing table, add it
+	if !emailExists {
+		log.Println("Migrating users table to add email column")
+		
+		// First add the column allowing nulls temporarily
+		_, err = db.Exec(`
+			ALTER TABLE users 
+			ADD COLUMN email TEXT
+		`)
+		
+		if err != nil {
+			return fmt.Errorf("failed to add email column: %w", err)
+		}
+		
+		// Generate default emails for existing users based on their user_id
+		_, err = db.Exec(`
+			UPDATE users 
+			SET email = CONCAT(user_id, '@temp_migration.com')
+			WHERE email IS NULL
+		`)
+		
+		if err != nil {
+			return fmt.Errorf("failed to add default emails: %w", err)
+		}
+		
+		// Now add the NOT NULL and UNIQUE constraints
+		_, err = db.Exec(`
+			ALTER TABLE users 
+			ALTER COLUMN email SET NOT NULL;
+			
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email
+			ON users(email);
+		`)
+		
+		if err != nil {
+			return fmt.Errorf("failed to set constraints on email column: %w", err)
+		}
+		
+		log.Println("Users table migration completed successfully")
+	}
+	
+	return nil
 }
 
 // initDB creates the necessary tables if they don't exist
@@ -44,6 +115,7 @@ func initDB(db *sql.DB) error {
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			user_id TEXT PRIMARY KEY,
+			email TEXT UNIQUE NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
@@ -112,6 +184,12 @@ func initDB(db *sql.DB) error {
 	}
 
 	log.Println("Database initialized successfully")
+
+	// Perform any necessary migrations
+	if err = migrateTables(db); err != nil {
+		return fmt.Errorf("failed to migrate tables: %w", err)
+	}
+
 	return nil
 }
 

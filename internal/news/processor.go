@@ -80,7 +80,7 @@ func (p *Processor) analyzeSentiment(item NewsItem) float64 {
 		sentiment *= MoneyControlMultiplier
 	case "Economic Times":
 		sentiment *= EconomicTimesMultiplier
-	case "Business Standard":
+	case "Business Standard", "Business Standard Markets", "Business Standard Stock Market":
 		sentiment *= BusinessStandardMultiplier
 	}
 
@@ -183,7 +183,7 @@ func (p *Processor) calculateConfidence(item NewsItem) float64 {
 		confidence += MoneyControlConfidence
 	case "Economic Times":
 		confidence += EconomicTimesConfidence
-	case "Business Standard":
+	case "Business Standard", "Business Standard Markets", "Business Standard Stock Market":
 		confidence += BusinessStandardConfidence
 	default:
 		confidence += DefaultSourceConfidence

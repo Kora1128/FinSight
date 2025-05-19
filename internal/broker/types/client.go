@@ -2,7 +2,7 @@ package types
 
 import (
 	"context"
-	
+
 	"github.com/Kora1128/FinSight/internal/models"
 )
 
@@ -15,17 +15,17 @@ type Client interface {
 	GetPositions(ctx context.Context) ([]models.Holding, error)
 
 	// Login authenticates the user with the broker
-	Login(requestToken, apiSecret string) error
-	
+	Login() error
+
 	// CanAutoRefresh checks if the client can refresh the token automatically
 	CanAutoRefresh() bool
-	
+
 	// RefreshToken refreshes the access token
 	RefreshToken() error
-	
+
 	// GetAccessToken returns the current access token
 	GetAccessToken() string
-	
-	// GetRefreshToken returns the refresh token
-	GetRefreshToken() string
+
+	// SetAccessToken sets the access token
+	SetAccessToken(accessToken string)
 }

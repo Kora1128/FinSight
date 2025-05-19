@@ -11,6 +11,7 @@ import (
 // SessionAuthConfig holds configuration for session authentication middleware
 type SessionAuthConfig struct {
 	SessionRepo *database.SessionRepo
+	UserRepo    *database.UserRepo
 }
 
 // SessionAuth returns middleware to check if a user is authenticated via user session
@@ -26,6 +27,7 @@ func SessionAuth(config SessionAuthConfig) gin.HandlerFunc {
 			return
 		}
 
+		// First try to authenticate by session token
 		// Get authorization header
 		authHeader := c.GetHeader("Authorization")
 		var sessionToken string
@@ -40,38 +42,44 @@ func SessionAuth(config SessionAuthConfig) gin.HandlerFunc {
 			sessionToken = c.Query("sessionToken")
 		}
 
-		if sessionToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"error":   "Session token is required",
-			})
-			c.Abort()
-			return
+		if sessionToken != "" {
+			// Authenticate using the session token
+			session, err := config.SessionRepo.GetSession(sessionToken)
+			if err == nil && session != nil && session.IsValid() {
+				// Check if session belongs to the requested user
+				if session.UserID == userID {
+					// Valid session, update last accessed time
+					_ = config.SessionRepo.UpdateLastAccessed(sessionToken)
+					// Continue with the request
+					c.Next()
+					return
+				}
+			}
 		}
-
-		// Get session from database
-		session, err := config.SessionRepo.GetSession(sessionToken)
+		
+		// If token authentication failed, try to get a valid session for this user directly
+		session, err := config.SessionRepo.GetUserSession(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
-				"error":   "Failed to validate session",
+				"error":   "Failed to validate user",
 			})
 			c.Abort()
 			return
 		}
 
-		// Check if session exists and belongs to the requested user
-		if session == nil || session.UserID != userID {
+		// Check if a valid session exists for this user
+		if session == nil || !session.IsValid() {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
-				"error":   "Invalid or expired session token",
+				"error":   "Invalid or expired session",
 			})
 			c.Abort()
 			return
 		}
 
 		// Update last accessed time
-		_ = config.SessionRepo.UpdateLastAccessed(sessionToken)
+		_ = config.SessionRepo.UpdateLastAccessed(session.SessionID)
 
 		// Session is valid, continue
 		c.Next()

@@ -23,7 +23,7 @@ func NewBrokerCredentialsRepo(db *DB) *BrokerCredentialsRepo {
 }
 
 // SaveCredentials saves broker credentials to the database
-func (r *BrokerCredentialsRepo) SaveCredentials(userID string, brokerType string, apiKey string, apiSecret string) error {
+func (r *BrokerCredentialsRepo) SaveCredentials(userID string, brokerType string, apiKey string, apiSecret string, requestToken string, expiryTime time.Time) error {
 	// Check if credentials already exist
 	var id int
 	err := r.db.QueryRow(
@@ -38,14 +38,14 @@ func (r *BrokerCredentialsRepo) SaveCredentials(userID string, brokerType string
 	if errors.Is(err, sql.ErrNoRows) {
 		// Insert new credentials
 		_, err = r.db.Exec(
-			"INSERT INTO broker_credentials (user_id, broker_type, api_key, api_secret) VALUES ($1, $2, $3, $4)",
-			userID, brokerType, apiKey, apiSecret,
+			"INSERT INTO broker_credentials (user_id, broker_type, api_key, api_secret,access_token, token_expiry) VALUES ($1, $2, $3, $4, $5, $6)",
+			userID, brokerType, apiKey, apiSecret, requestToken, expiryTime,
 		)
 	} else {
 		// Update existing credentials
 		_, err = r.db.Exec(
-			"UPDATE broker_credentials SET api_key = $1, api_secret = $2, updated_at = $3 WHERE user_id = $4 AND broker_type = $5",
-			apiKey, apiSecret, time.Now(), userID, brokerType,
+			"UPDATE broker_credentials SET api_key = $1, api_secret = $2, access_token = $3, updated_at = $4 WHERE user_id = $5 AND broker_type = $6",
+			apiKey, apiSecret, requestToken, time.Now(), userID, brokerType,
 		)
 	}
 

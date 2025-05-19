@@ -9,7 +9,7 @@ import (
 // BrokerCredentialsRepository defines the interface for storing and retrieving broker credentials
 type BrokerCredentialsRepository interface {
 	// SaveCredentials saves broker credentials to the repository
-	SaveCredentials(userID string, brokerType string, apiKey string, apiSecret string) error
+	SaveCredentials(userID string, brokerType string, apiKey string, apiSecret string, requestToken string, expiryTime time.Time) error
 
 	// GetCredentials retrieves broker credentials from the repository
 	GetCredentials(userID string, brokerType string) (*models.Credentials, error)

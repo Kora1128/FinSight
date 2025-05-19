@@ -44,7 +44,7 @@ func (h *NewsHandler) GetRecommendations(c *gin.Context) {
 
 // GetLatestRecommendations returns the most recent recommendations
 func (h *NewsHandler) GetLatestRecommendations(c *gin.Context) {
-	limitStr := c.DefaultQuery("limit", "10")
+	limitStr := c.DefaultQuery("limit", "20")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -55,7 +55,7 @@ func (h *NewsHandler) GetLatestRecommendations(c *gin.Context) {
 	}
 
 	if limit <= 0 || limit > 100 {
-		limit = 10 // Default to 10 if limit is invalid
+		limit = 20 // Default to 10 if limit is invalid
 	}
 
 	recommendations := h.processor.GetLatestRecommendations(limit)
